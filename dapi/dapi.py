@@ -1,6 +1,11 @@
-from fastapi                  import FastAPI
-from fastapi.middleware.cors  import CORSMiddleware
-from dapi.controllers         import controller
+from fastapi                          import FastAPI
+from fastapi.middleware.cors  	      import CORSMiddleware
+
+from dapi.db                          import Base, engine
+from dapi.controllers.dapi_controller import start_dapi
+
+
+Base.metadata.create_all(bind=engine)
 
 dapi = FastAPI()
 
@@ -12,7 +17,7 @@ dapi.add_middleware(
 	allow_headers=['*'],
 )
 
-dapi.include_router(controller.router)
+start_dapi(dapi)
 
 @dapi.get('/')
 async def root():
