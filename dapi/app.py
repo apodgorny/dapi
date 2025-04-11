@@ -1,15 +1,12 @@
 from fastapi                          import FastAPI
 from fastapi.middleware.cors  	      import CORSMiddleware
 
-from dapi.db                          import Base, engine
-from dapi.controllers.dapi_controller import start_dapi
+from dapi.controllers.dapi_controller import dapi
 
 
-Base.metadata.create_all(bind=engine)
+app = FastAPI()
 
-dapi = FastAPI()
-
-dapi.add_middleware(
+app.add_middleware(
 	CORSMiddleware,
 	allow_origins=['*'],  # or ['http://127.0.0.1:8000']
 	allow_credentials=True,
@@ -17,8 +14,8 @@ dapi.add_middleware(
 	allow_headers=['*'],
 )
 
-start_dapi(dapi)
+dapi.start(app)
 
-@dapi.get('/')
+@app.get('/')
 async def root():
 	return { 'message': 'It works' }

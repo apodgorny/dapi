@@ -7,7 +7,7 @@
         "request": "launch",
         "module": "uvicorn",
         "args": [
-          "dapi.dapi:dapi",
+          "dapi.app:app",
           "--reload"
         ],
         "jinja": true,

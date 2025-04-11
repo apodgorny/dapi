@@ -1,85 +1,35 @@
-from typing   import Any, Callable, Type, List, Dict
+from dapi.lib.dapi import DAPI
+from dapi.services import TypeService, OperatorService
+from dapi.schemas  import (
+	IdSchema,
+    NameSchema,
+	EmptySchema,
+	StatusSchema,
+	
+	TypeSchema,
+	TypesSchema,
+	
+	OperatorSchema,
+	OperatorsSchema,
+	
+	TransactionCreateSchema,
+	TransactionSchema,
 
-from fastapi           import FastAPI, APIRouter, Depends
-from pydantic          import BaseModel, create_model, Field
-from fastapi.responses import JSONResponse
-from sqlalchemy.orm    import Session
+	AssignmentSchema,
+	AssignmentsSchema,
 
-from dapi.db import get_db
-from dapi.schemas import (
-    # inputs
-    CreateTypeInputSchema,
-    GetTypeInputSchema,
-    ListTypesInputSchema,
-    DeleteTypeInputSchema,
-    CreateOperatorInputSchema,
-    ListOperatorsInputSchema,
-    DeleteOperatorInputSchema,
-    CreateTransactionInputSchema,
-    CreateTransactionAssignmentInputSchema,
-    InvokeTransactionInputSchema,
-    ListTransactionsInputSchema,
-    DeleteTransactionInputSchema,
-    CreateScopeInputSchema,
-    # outputs
-    TypeInfoSchema,
-    ListTypesOutputSchema,
-    OperatorInfoSchema,
-    ListOperatorsOutputSchema,
-    TransactionInfoSchema,
-    ListTransactionsOutputSchema,
-    AssignmentInfoSchema,
-    InvokeTransactionOutputSchema,
-    ScopeInfoSchema
+	FunctionSchema
 )
-from dapi.services import TypeService
 
-# ---------------------------------------------------------------------------
-# Local helper schemas
-# ---------------------------------------------------------------------------
+dapi = DAPI(
+	TypeService,
+	OperatorService
+)
 
-class StatusOutputSchema(BaseModel):
-    status: str
-
-# ---------------------------------------------------------------------------
-# Router & dynamic registration helper
-# ---------------------------------------------------------------------------
-
-router = APIRouter(prefix='/dapi')
-
-def start_dapi(dapi: FastAPI):
-    dapi.include_router(router)
-    print('Hello, DAPI!')
-
-
-def define(
-    path          : str,
-    input_model   : Type[Any],
-    output_model  : Type[Any],
-    invoke_handler: Callable[[Any], Any],
-    description   : str = ''
-):
-    '''Registers a DAPI operator route dynamically.'''
-
-    async def endpoint(input: input_model):  # type: ignore[name-defined]
-        return await invoke_handler(input)  # type: ignore[name-defined]
-
-    endpoint.__name__ = f'dapi_{path.strip("/").replace("/", "_")}_handler'
-    endpoint.__doc__  = description
-
-    router.add_api_route(
-        path           = f'/{path.strip("/")}',
-        endpoint       = endpoint,
-        methods        = ['POST'],
-        response_model = output_model,
-        name           = f'dapi:{path}',
-        response_class = JSONResponse,
-        description    = description
-    )
-
-# ---------------------------------------------------------------------------
 # Example dynamic operator
-# ---------------------------------------------------------------------------
+###########################################################################
+
+from pydantic import create_model, Field
 
 ExampleInput  = create_model('ExampleInput',  value=(int, Field(...)))
 ExampleOutput = create_model('ExampleOutput', value=(int, Field(...)))
@@ -87,110 +37,108 @@ ExampleOutput = create_model('ExampleOutput', value=(int, Field(...)))
 async def double_handler(input: ExampleInput) -> ExampleOutput:  # type: ignore[arg-type]
     return ExampleOutput(value=input.value * 2)
 
-define('double', ExampleInput, ExampleOutput, double_handler, description='Doubles the input value')
+dapi.define_operator_route(
+	'double',
+	ExampleInput,
+	ExampleOutput,
+	double_handler,
+	description='Doubles the input value'
+)
 
-# ---------------------------------------------------------------------------
 # TYPE endpoints
-# ---------------------------------------------------------------------------
+###########################################################################
 
-@router.post('/create_type', response_model=TypeInfoSchema)
-async def create_type(input: CreateTypeInputSchema, db: Session = Depends(get_db)):
+@dapi.router.post('/create_type', response_model=TypeSchema)
+async def create_type(input: TypeSchema):
 	'''Creates a new type in the DAPI system using a name and JSON schema.'''
-	service = TypeService(db)
-	service.create(name=input.name, schema=input.schema)
-	return TypeInfoSchema(name=input.name, schema=input.schema)
+	dapi.type_service.create(name=input.name, schema=input.schema)
+	return TypeSchema(name=input.name, schema=input.schema)
 
-
-@router.post('/get_type', response_model=TypeInfoSchema)
-async def get_type(input: GetTypeInputSchema, db: Session = Depends(get_db)):
+@dapi.router.post('/get_type', response_model=TypeSchema)
+async def get_type(input: NameSchema):
 	'''Returns a single type definition by name.'''
-	service = TypeService(db)
-	record = service.get(input.name)
+	record = dapi.type_service.get(input.name)
 	return TypeInfoSchema(**record)
 
-
-@router.post('/get_all_types', response_model=ListTypesOutputSchema)
-async def get_all_types(input: ListTypesInputSchema, db: Session = Depends(get_db)):
+@dapi.router.post('/get_all_types', response_model=TypesSchema)
+async def get_all_types(input: EmptySchema):
 	'''Returns a list of all registered types with full definitions.'''
-	service = TypeService(db)
-	records = service.get_all()
+	records = dapi.type_service.get_all()
 	return ListTypesOutputSchema(data=[TypeInfoSchema(**r) for r in records])
 
-
-@router.post('/delete_type', response_model=StatusOutputSchema)
-async def delete_type(input: DeleteTypeInputSchema, db: Session = Depends(get_db)):
+@dapi.router.post('/delete_type', response_model=StatusSchema)
+async def delete_type(input: NameSchema):
 	'''Removes a type from the system by name.'''
-	service = TypeService(db)
-	service.delete(input.name)
-	return {'status': 'deleted'}
+	dapi.type_service.delete(input.name)
+	return {'status': 'success'}
 	
-# ---------------------------------------------------------------------------
+
 # OPERATOR endpoints
-# ---------------------------------------------------------------------------
+###########################################################################
 
-@router.post('/create_operator', response_model=OperatorInfoSchema)
-async def create_operator(input: CreateOperatorInputSchema):
-    '''Defines a new operator by name, input/output types, and executable code.'''
-    # TODO: OperatorService.save_operator
-    return OperatorInfoSchema(**input.model_dump())
+@dapi.router.post('/create_operator', response_model=OperatorSchema)
+async def create_operator(input: OperatorSchema):
+	'''Defines a new operator by name, input/output types, and executable code.'''
+	operator = OperatorSchema(**input.model_dump())
+	name = dapi.operator_service.create(operator)
+	return dapi.operator_service.get(name)
+
+@dapi.router.post('/list_operators', response_model=OperatorsSchema)
+async def list_operators(input: EmptySchema):
+	'''Returns a list of all registered operators.'''
+	records = dapi.operator_service.get_all()
+	return ListOperatorsOutputSchema(data=records)
+
+@dapi.router.post('/delete_operator', response_model=StatusSchema)
+async def delete_operator(input: NameSchema):
+	'''Removes an operator from the system by name.'''
+	dapi.operator_service.delete(input.name)
+	return {'status': 'success'}
+
+@dapi.router.post('/get_operator', response_model=OperatorSchema)
+async def get_operator(input: NameSchema):
+	'''Returns a single operator by name.'''
+	return dapi.operator_service.get(input.name)
 
 
-@router.post('/list_operators', response_model=ListOperatorsOutputSchema)
-async def list_operators(input: ListOperatorsInputSchema):
-    '''Returns a list of all registered operators.'''
-    # TODO: OperatorService.list_operators
-    return ListOperatorsOutputSchema(data=[])
-
-
-@router.post('/delete_operator', response_model=StatusOutputSchema)
-async def delete_operator(input: DeleteOperatorInputSchema):
-    '''Removes an operator from the system by name.'''
-    # TODO: OperatorService.delete_operator
-    return {'status': 'deleted'}
-
-# ---------------------------------------------------------------------------
 # TRANSACTION endpoints
-# ---------------------------------------------------------------------------
+###########################################################################
 
-@router.post('/create_transaction', response_model=TransactionInfoSchema)
-async def create_transaction(input: CreateTransactionInputSchema):
+@dapi.router.post('/create_transaction', response_model=TransactionCreateSchema)
+async def create_transaction(input: TransactionSchema):
     '''Creates a transaction that wraps the invocation of a given operator.'''
     # TODO: TransactionService.create_transaction
     return TransactionInfoSchema(id='tx_1', operator=input.operator)
 
-
-@router.post('/create_transaction_assignment', response_model=AssignmentInfoSchema)
-async def create_transaction_assignment(input: CreateTransactionAssignmentInputSchema):
+@dapi.router.post('/create_transaction_assignment', response_model=AssignmentSchema)
+async def create_transaction_assignment(input: AssignmentSchema):
     '''Creates an assignment that transfers values into the transaction input.'''
     # TODO: AssignmentService.create
     return AssignmentInfoSchema(id='as_1', **input.model_dump())
 
+# @dapi.router.post('/invoke_transaction', response_model=InvokeTransactionOutputSchema)
+# async def invoke_transaction(input: InvokeTransactionInputSchema):
+#     '''Runs a transaction and returns its output; then deletes the transaction.'''
+#     # TODO: TransactionService.invoke
+#     return InvokeTransactionOutputSchema(output={'value': 42})
 
-@router.post('/invoke_transaction', response_model=InvokeTransactionOutputSchema)
-async def invoke_transaction(input: InvokeTransactionInputSchema):
-    '''Runs a transaction and returns its output; then deletes the transaction.'''
-    # TODO: TransactionService.invoke
-    return InvokeTransactionOutputSchema(output={'value': 42})
-
-
-@router.post('/list_transactions', response_model=ListTransactionsOutputSchema)
-async def list_transactions(input: ListTransactionsInputSchema):
+@dapi.router.post('/list_transactions', response_model=AssignmentsSchema)
+async def list_transactions(input: EmptySchema):
     '''Returns a list of existing transactions (if not yet invoked).'''
-    return ListTransactionsOutputSchema(data=[])
+    return AssignmentsSchema(data=[])
 
-
-@router.post('/delete_transaction', response_model=StatusOutputSchema)
-async def delete_transaction(input: DeleteTransactionInputSchema):
+@dapi.router.post('/delete_transaction', response_model=StatusSchema)
+async def delete_transaction(input: IdSchema):
     '''Removes a transaction from the system before it is invoked.'''
     # TODO: TransactionService.delete
-    return {'status': 'deleted'}
+    return {'status': 'success'}
 
-# ---------------------------------------------------------------------------
+
 # SCOPE endpoint
-# ---------------------------------------------------------------------------
+###########################################################################
 
-@router.post('/create_scope', response_model=ScopeInfoSchema)
-async def create_scope(input: CreateScopeInputSchema):
-    '''Creates a composite operator from transaction chain and shared scope.'''
+@dapi.router.post('/create_function', response_model=FunctionSchema)
+async def create_function(input: FunctionSchema):
+    '''Creates a function composite operator from transaction chain and shared scope.'''
     # TODO: ScopeService.create
-    return ScopeInfoSchema(**input.model_dump())
+    return FunctionSchema(**input.model_dump())
