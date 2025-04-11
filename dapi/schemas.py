@@ -88,8 +88,8 @@ class TransactionsSchema(BaseModel):
 class AssignmentSchema(BaseModel):
 	id             : str = None
 	transaction_id : str = Field(..., description='Target transaction')
-	target         : str = Field(..., description='Accessor to assign to (target)')
-	source         : Any = Field(..., description='Accessor to assign from (source)')
+	l_accessor     : str = Field(..., description='Accessor to assign to (target)')
+	r_accessor     : str = Field(..., description='Accessor to assign from (source)')
 
 class AssignmentsSchema(BaseModel):
 	items: List[AssignmentSchema]
@@ -98,10 +98,15 @@ class AssignmentsSchema(BaseModel):
 # INVOCATION schemas
 ###########################################################################
 
-class InvokeTransactionInputSchema(BaseModel):
-	transaction_id: str
+class OperatorInputSchema(BaseModel):
+	name  : str
+	input : Dict[str, Any]
 
-class InvokeTransactionOutputSchema(BaseModel):
+class TransactionInputSchema(BaseModel):
+	name  : str
+	input : Dict[str, Any]
+
+class OutputSchema(BaseModel):
 	output: Dict[str, Any]
 
 

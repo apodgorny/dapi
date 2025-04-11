@@ -46,11 +46,10 @@ class TypeService:
 		return name
 
 	def get(self, name: str) -> dict:
-		record = self.require(name)
-		return record.to_dict()
+		return self.require(name).schema
 
 	def get_all(self) -> list[dict]:
-		return [t.to_dict() for t in self.dapi.db.query(TypeTable).all()]
+		return [t.schema for t in self.dapi.db.query(TypeTable).all()]
 
 	def delete(self, name: str) -> None:
 		record = self.require(name)

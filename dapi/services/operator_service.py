@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from fastapi import HTTPException
+from fastapi   import HTTPException
+from pydantic  import BaseModel
 
-from dapi.db import OperatorTable
+from dapi.db   import OperatorTable
+from dapi.lib  import Datum
+from dapi.schemas import OperatorSchema
 # from dapi.services.interpreter_service import InterpreterService
 
 
@@ -13,6 +16,39 @@ class OperatorService:
 		self.dapi = dapi
 
 	############################################################################
+
+	async def _create_invoke_handler(self, operator_schema):
+		output_schema = self.type_name_to_schema(operator_schema.output_type)
+		
+		async def handler(input):
+			print(f'Operator {operator_schema.name} is called with input: {input}')
+			print(f'Input type: {type(input)}')
+			
+			# For simple doubling operation demonstration
+			if hasattr(input, 'number'):
+				print(f'Input has number attribute: {input.number}')
+				result = output_schema(number=input.number * 2)
+				print(f'Result created: {result}')
+				return result
+			elif hasattr(input, 'value'):
+				print(f'Input has value attribute: {input.value}')
+				result = output_schema(value=input.value * 2)
+				print(f'Result created: {result}')
+				return result
+			
+			# If nothing else works, just return the input
+			print('No matching attributes found, returning input')
+			return input
+			
+		return handler
+
+
+	def type_name_to_schema(self, type_name: str) -> type[BaseModel]:
+		print(type_name, self.dapi.type_service.get(type_name))
+		# NumberType {'name': 'NumberType', 'schema': {'title': 'NumberType', 'type': 'object', 'properties': {'number': {'type': 'number'}}, 'required': ['number']}}
+		schema_dict = self.dapi.type_service.get(type_name)
+		datum = Datum(schema_dict)
+		return datum.schema
 
 	def validate_name(self, name: str) -> None:
 		if self.dapi.db.get(OperatorTable, name):
@@ -36,7 +72,7 @@ class OperatorService:
 
 	############################################################################
 
-	def create(self, schema: OperatorSchema) -> str:
+	async def create(self, schema: OperatorSchema) -> str:
 		self.validate_name(schema.name)
 		self.validate_io(schema)
 		# self.validate_interpreter(schema.interpreter)
@@ -46,15 +82,26 @@ class OperatorService:
 		self.dapi.db.add(record)
 		self.dapi.db.commit()
 
-		# Register with define()
-		self.define(
-			name        = schema.name,
-			input_type  = schema.input_type,
-			output_type = schema.output_type,
-			interpreter = schema.interpreter,
-			code        = schema.code,
-			description = schema.description,
-		)
+		handler = await self._create_invoke_handler(schema)
+		
+		# print(f"Before define_operator_route for {schema.name}")
+		# input_schema = self.type_name_to_schema(schema.input_type)
+		# output_schema = self.type_name_to_schema(schema.output_type)
+		# print(f"Input schema: {input_schema}")
+		# print(f"Output schema: {output_schema}")
+
+		# # Register with define()
+		# try:
+		# 	self.dapi.define_operator_route(
+		# 		name           = schema.name,
+		# 		input_schema   = input_schema,
+		# 		output_schema  = output_schema,
+		# 		description    = schema.description,
+		# 		invoke_handler = handler
+		# 	)
+		# 	print(f"Route registered successfully for {schema.name}")
+		# except Exception as e:
+		# 	print(f"Error registering route for {schema.name}: {e}")
 
 		return schema.name
 
@@ -70,3 +117,19 @@ class OperatorService:
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()
 
+	async def invoke(self, name: str, raw_input: dict) -> dict:
+		operator     = self.require(name)
+		input_datum  = Datum(self.dapi.type_service.get(operator.input_type))
+		output_datum = Datum(self.dapi.type_service.get(operator.output_type))
+		interpreter  = self.dapi.interpreter_service.require(operator.interpreter)
+		code         = operator.code
+
+		input_datum.validate(raw_input)  # TODO: have validate take substring explaining what action was taken that produced error
+
+		output = interpreter.invoke(
+			code  = code,
+			input = input_datum
+		)
+
+		output_datum.validate(result)
+		return output_datum.to_dict()

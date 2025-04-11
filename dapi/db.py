@@ -20,13 +20,8 @@ load_dotenv()
 # SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 ################################################################################
 
-# SQLite connection URL:
-# By default, it uses a local SQLite file named 'sqlite.db'.
-# You can override this by setting the DB_URL env variable.
-DB_URL = os.getenv('DB_URL', 'sqlite:///./sqlite.db')
-
-# For SQLite, we need to disable the same thread check.
-engine = create_engine(DB_URL, connect_args={"check_same_thread": False}, echo=True)
+DB_URL       = os.getenv('DB_URL')
+engine       = create_engine(DB_URL, connect_args={'check_same_thread': False}, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
