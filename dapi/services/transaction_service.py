@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from fastapi import HTTPException
 import uuid
 
-from dapi.db import TransactionTable
-from dapi.schemas import TransactionSchema, TransactionCreateSchema
+from dapi.db        import TransactionTable
+from dapi.lib       import DapiService, DapiException
+from dapi.schemas   import TransactionSchema, TransactionCreateSchema
 
-class TransactionService:
+
+@DapiService.wrap_exceptions()
+class TransactionService(DapiService):
 	'''Service for creating, invoking, and deleting transactions.'''
 
 	def __init__(self, dapi):
@@ -16,17 +18,17 @@ class TransactionService:
 
 	def validate_id(self, tx_id: str) -> None:
 		if self.dapi.db.get(TransactionTable, tx_id):
-			raise HTTPException(status_code=400, detail=f'Transaction `{tx_id}` already exists')
+			raise DapiException(status_code=400, detail=f'Transaction `{tx_id}` already exists', severity=DapiException.BEWARE)
 
 	def require(self, tx_id: str) -> TransactionTable:
 		record = self.dapi.db.get(TransactionTable, tx_id)
 		if not record:
-			raise HTTPException(status_code=404, detail=f'Transaction `{tx_id}` does not exist')
+			raise DapiException(status_code=404, detail=f'Transaction `{tx_id}` does not exist', severity=DapiException.HALT)
 		return record
 
 	############################################################################
 
-	def create(self, schema: TransactionSchema) -> str:
+	async def create(self, schema: TransactionSchema) -> str:
 		# Generate ID if not provided
 		if not schema.id:
 			schema.id = str(uuid.uuid4())
@@ -50,16 +52,19 @@ class TransactionService:
 
 		return schema.id
 
-	def get(self, tx_id: str) -> dict:
+	async def get(self, tx_id: str) -> dict:
 		record = self.require(tx_id)
 		return record.to_dict()
 
-	def get_all(self) -> list[dict]:
+	async def get_all(self) -> list[dict]:
 		transactions = self.dapi.db.query(TransactionTable).all()
 		return [tx.to_dict() for tx in transactions]
 		
 	async def invoke(self, tx_name: str, input_data: dict) -> dict:
 		"""Invoke a transaction by ID, executing its associated operator"""
+		if not tx_name:
+			raise DapiException(status_code=400, detail="Transaction name cannot be empty")
+			
 		transaction = self.require(tx_name)
 		
 		# Get the operator associated with this transaction
@@ -80,13 +85,18 @@ class TransactionService:
 			# Return the result
 			return result
 			
-		except Exception as e:
-			# If anything goes wrong, clean up the transaction data
+		except DapiException:
+			# Pass through DapiExceptions
 			transaction.input = None
 			self.dapi.db.commit()
-			raise HTTPException(status_code=500, detail=f"Error invoking transaction: {str(e)}")
+			raise
+		except Exception as e:
+			# If anything goes wrong, clean up the transaction data and provide a detailed error
+			transaction.input = None
+			self.dapi.db.commit()
+			raise DapiException(status_code=500, detail=f"Error invoking transaction: {str(e)}", severity=DapiException.HALT)
 
-	def delete(self, tx_id: str) -> None:
+	async def delete(self, tx_id: str) -> None:
 		record = self.require(tx_id)
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()

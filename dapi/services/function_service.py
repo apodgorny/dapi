@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from fastapi import HTTPException
 import uuid
 
-from dapi.db     import FunctionTable
-from dapi.schemas import FunctionSchema
+from dapi.db        import FunctionTable
+from dapi.lib       import DapiService, DapiException
+from dapi.schemas   import FunctionSchema
 
 
-class FunctionService:
+@DapiService.wrap_exceptions()
+class FunctionService(DapiService):
 	'''Service for managing functions — operators without code, used for static routing.'''
 
 	def __init__(self, dapi):
@@ -17,17 +18,17 @@ class FunctionService:
 
 	def validate_name(self, name: str) -> None:
 		if self.dapi.db.get(FunctionTable, name):
-			raise HTTPException(status_code=400, detail=f'Function `{name}` already exists')
+			raise DapiException(status_code=400, detail=f'Function `{name}` already exists', severity=DapiException.BEWARE)
 
 	def require(self, name: str) -> FunctionTable:
 		record = self.dapi.db.get(FunctionTable, name)
 		if not record:
-			raise HTTPException(status_code=404, detail=f'Function `{name}` does not exist')
+			raise DapiException(status_code=404, detail=f'Function `{name}` does not exist', severity=DapiException.HALT)
 		return record
 
 	############################################################################
 
-	def create(self, schema: FunctionSchema) -> str:
+	async def create(self, schema: FunctionSchema) -> str:
 		self.validate_name(schema.name)
 
 		# Create FunctionTable record
@@ -43,7 +44,7 @@ class FunctionService:
 
 		return schema.name
 
-	def delete(self, name: str) -> None:
+	async def delete(self, name: str) -> None:
 		record = self.require(name)
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()

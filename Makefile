@@ -1,7 +1,7 @@
 #!make
 include .env
 
-.PHONY: start clean test apitest check
+.PHONY: start clear test apitest check
 
 check:
 	echo $(PROJECT_PATH)
@@ -15,6 +15,5 @@ test:
 apitest:
 	clear && schemathesis run http://127.0.0.1:8000/openapi.json --base-url=http://localhost:8000 --experimental=openapi-3.1 || true && rm "$(PROJECT_PATH)/dapi.db"
 
-clean:     ## Remove __pycache__ and .pyc files
-	find . -type d -name '__pycache__' -exec rm -r {} + ; \
-	find . -type f -name '*.py[co]' -delete
+clear:
+	clear && rm "$(PROJECT_PATH)/dapi.db" && echo "Cleared database"

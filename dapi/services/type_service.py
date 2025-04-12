@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from fastapi import HTTPException
-
-from dapi.db import TypeTable
-from dapi.lib.datum import DatumSchemaError, Datum
+from dapi.db        import TypeTable
+from dapi.lib       import DatumSchemaError, Datum, DapiException, DapiService
 
 
-class TypeService:
+@DapiService.wrap_exceptions({DatumSchemaError: (422, 'halt')})
+class TypeService(DapiService):
 	'''Service for managing JSON Schema types via SQLAlchemy.'''
 
 	def __init__(self, dapi):
@@ -16,28 +15,28 @@ class TypeService:
 
 	def validate_name(self, name: str) -> None:
 		if self.dapi.db.get(TypeTable, name):
-			raise HTTPException(status_code=400, detail=f'Type `{name}` already exists')
+			raise DapiException(status_code=400, detail=f'Type `{name}` already exists', severity=DapiException.BEWARE)
 
 	def validate_jsonschema(self, schema):
 		try:
 			Datum.assert_valid_jsonschema(schema)
 		except DatumSchemaError as exc:
-			raise HTTPException(status_code=422, detail=str(exc))
+			raise DapiException(status_code=422, detail=str(exc))
 
 	def require(self, name: str) -> TypeTable:
 		if not name:
-			raise HTTPException(status_code=400, detail=f'Type name cannot be empty')
+			raise DapiException(status_code=400, detail=f'Type name cannot be empty')
 		record = self.dapi.db.get(TypeTable, name)
 		if not record:
-			raise HTTPException(status_code=404, detail=f'Type `{name}` does not exist')
+			raise DapiException(status_code=404, detail=f'Type `{name}` does not exist')
 		return record
 
 	############################################################################
 
-	def has(self, name: str) -> bool:
+	async def has(self, name: str) -> bool:
 		return bool(self.dapi.db.get(TypeTable, name))
 
-	def create(self, name: str, schema: dict) -> str:
+	async def create(self, name: str, schema: dict) -> str:
 		self.validate_name(name)
 		self.validate_jsonschema(schema)
 
@@ -47,15 +46,15 @@ class TypeService:
 		self.dapi.db.commit()
 		return name
 
-	def get(self, name: str) -> dict:
+	async def get(self, name: str) -> dict:
 		record = self.require(name)
 		return {'name': record.name, 'schema': record.schema}
 
-	def get_all(self) -> list[dict]:
+	async def get_all(self) -> list[dict]:
 		types = self.dapi.db.query(TypeTable).all()
 		return [{'name': t.name, 'schema': t.schema} for t in types]
 
-	def delete(self, name: str) -> None:
+	async def delete(self, name: str) -> None:
 		record = self.require(name)
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()

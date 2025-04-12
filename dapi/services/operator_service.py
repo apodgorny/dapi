@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from fastapi   import HTTPException
-from pydantic  import BaseModel
+from pydantic       import BaseModel
 
-from dapi.db   import OperatorTable
-from dapi.lib  import Datum
-from dapi.schemas import OperatorSchema
-# from dapi.services.interpreter_service import InterpreterService
+from dapi.db        import OperatorTable
+from dapi.lib       import Datum, DatumSchemaError, DapiService, DapiException
+from dapi.schemas   import OperatorSchema
 
 
-class OperatorService:
+@DapiService.wrap_exceptions({DatumSchemaError: (400, 'halt')})
+class OperatorService(DapiService):
 	'''Service for managing operators: atomic_static, atomic_dynamic, composite.'''
 
 	def __init__(self, dapi):
@@ -17,100 +16,111 @@ class OperatorService:
 
 	############################################################################
 
-	async def _create_invoke_handler(self, operator_schema):
-		output_schema = self.type_name_to_schema(operator_schema.output_type)
-		
-		async def handler(input):
-			print(f'Operator {operator_schema.name} is called with input: {input}')
-			print(f'Input type: {type(input)}')
-			
-			# For simple doubling operation demonstration
-			if hasattr(input, 'number'):
-				print(f'Input has number attribute: {input.number}')
-				result = output_schema(number=input.number * 2)
-				print(f'Result created: {result}')
-				return result
-			elif hasattr(input, 'value'):
-				print(f'Input has value attribute: {input.value}')
-				result = output_schema(value=input.value * 2)
-				print(f'Result created: {result}')
-				return result
-			
-			# If nothing else works, just return the input
-			print('No matching attributes found, returning input')
-			return input
-			
-		return handler
-
-
-	def type_name_to_schema(self, type_name: str) -> type[BaseModel]:
-		print(type_name, self.dapi.type_service.get(type_name))
-		# NumberType {'name': 'NumberType', 'schema': {'title': 'NumberType', 'type': 'object', 'properties': {'number': {'type': 'number'}}, 'required': ['number']}}
-		schema_dict = self.dapi.type_service.get(type_name)
-		datum = Datum(schema_dict)
-		return datum.schema
+	async def type_name_to_schema(self, type_name: str) -> type[BaseModel]:
+		schema_dict = await self.dapi.type_service.get(type_name)
+		try:
+			return Datum(schema_dict['schema']).schema
+		except DatumSchemaError as e:
+			raise DapiException(
+				status_code = 400,
+				detail      = str(e),
+				severity    = DapiException.HALT
+			)
 
 	def validate_name(self, name: str) -> None:
 		if self.dapi.db.get(OperatorTable, name):
-			raise HTTPException(status_code=400, detail=f'Operator `{name}` already exists')
+			raise DapiException(
+				status_code = 400,
+				detail      = f'Operator `{name}` already exists',
+				severity    = DapiException.BEWARE
+			)
 
 	def require(self, name: str) -> OperatorTable:
 		record = self.dapi.db.get(OperatorTable, name)
 		if not record:
-			raise HTTPException(status_code=404, detail=f'Operator `{name}` does not exist')
+			raise DapiException(
+				status_code = 404,
+				detail      = f'Operator `{name}` does not exist',
+				severity    = DapiException.HALT
+			)
 		return record
 
-	def validate_io(self, schema):
-		if not self.dapi.type_service.has(schema.input_type):
-			raise HTTPException(status_code=404, detail=f'Type `{schema.input_type}` specified in `{schema.name}.input_type` does not exist')
-		if not self.dapi.type_service.has(schema.output_type):
-			raise HTTPException(status_code=404, detail=f'Type `{schema.output_type}` specified in `{schema.name}.output_type` does not exist')
+	async def validate_io(self, schema):
+		for direction in ('input_type', 'output_type'):
+			type_name = getattr(schema, direction)
+			if not await self.dapi.type_service.has(type_name):
+				raise DapiException(
+					status_code = 404,
+					detail      = f'Type `{type_name}` specified in `{schema.name}.{direction}` does not exist',
+					severity    = DapiException.HALT
+				)
 
-	# def validate_interpreter(self, interpreter):
-	# 	if not self.dapi.interpreter_service.has(schema.interpreter):
-	# 		raise HTTPException(status_code=404, detail=f'Interpreter `{schema.interpreter}` specified in `{schema.name}.interpreter` does not exist')
+	def validate_data(self, datum: Datum, data: dict, label: str = ''):
+		try:
+			datum.validate(data)
+		except Exception as e:
+			raise DapiException(
+				status_code = 400,
+				detail      = f'Invalid {label} data: {str(e)}',
+				severity    = DapiException.HALT
+			)
+
+	async def validate_interpreter(self, interpreter):
+		if not await self.dapi.interpreter_service.has(interpreter):
+			raise DapiException(
+				status_code = 404,
+				detail      = f'Interpreter `{interpreter}` does not exist',
+				severity    = DapiException.HALT
+			)
 
 	############################################################################
 
 	async def create(self, schema: OperatorSchema) -> str:
 		self.validate_name(schema.name)
-		self.validate_io(schema)
-		# self.validate_interpreter(schema.interpreter)
+		await self.validate_io(schema)
+		await self.validate_interpreter(schema.interpreter)
 
 		record = OperatorTable(**schema.model_dump())
 
 		self.dapi.db.add(record)
 		self.dapi.db.commit()
-
-		handler = await self._create_invoke_handler(schema)
-		
 		return schema.name
 
-	def get(self, name: str) -> dict:
+	async def get(self, name: str) -> dict:
 		record = self.require(name)
 		return record.to_dict()
 
-	def get_all(self) -> list[dict]:
+	async def get_all(self) -> list[dict]:
 		return [op.to_dict() for op in self.dapi.db.query(OperatorTable).all()]
 
-	def delete(self, name: str) -> None:
+	async def delete(self, name: str) -> None:
 		record = self.require(name)
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()
 
-	async def invoke(self, name: str, raw_input: dict) -> dict:
-		operator     = self.require(name)
-		input_datum  = Datum(self.dapi.type_service.get(operator.input_type))
-		output_datum = Datum(self.dapi.type_service.get(operator.output_type))
-		interpreter  = self.dapi.interpreter_service.require(operator.interpreter)
-		code         = operator.code
+	async def invoke(self, name: str, input: dict) -> dict:
+		operator      = self.require(name)
+		input_schema  = await self.dapi.type_service.get(operator.input_type)
+		output_schema = await self.dapi.type_service.get(operator.output_type)
+		interpreter   = await self.dapi.interpreter_service.require(operator.interpreter)
 
-		input_datum.validate(raw_input)  # TODO: have validate take substring explaining what action was taken that produced error
+		# Create datum objects from the schema and add data
+		input_datum = Datum(input_schema['schema']).from_dict(input)
+		
+		try:
+			output = await interpreter.invoke(
+				code  = operator.code,
+				input = input_datum
+			)
+		except Exception as e:
+			raise DapiException(
+				status_code = 500,
+				detail      = f'Error during execution: {str(e)}',
+				severity    = DapiException.HALT
+			)
 
-		result = interpreter.invoke(
-			code  = code,
-			input = input_datum
-		)
-
-		output_datum.validate(result)
-		return result
+		# Validate the output against the schema
+		output_datum = Datum(output_schema['schema'])
+		self.validate_data(output_datum, output, label='output')
+		
+		return output

@@ -1,5 +1,6 @@
-from dapi.lib.dapi import DAPI
-from dapi.services import TypeService, OperatorService, TransactionService, AssignmentService, FunctionService, InterpreterService
+from dapi.lib.dapi import Dapi
+from dapi.services import TypeService, OperatorService, TransactionService
+from dapi.services import AssignmentService, FunctionService, InterpreterService
 from dapi.schemas  import (
 	IdSchema,
     NameSchema,
@@ -26,7 +27,7 @@ from dapi.schemas  import (
 	OutputSchema
 )
 
-dapi = DAPI(
+dapi = Dapi(
 	TypeService,
 	OperatorService,
 	TransactionService,
@@ -60,25 +61,25 @@ dapi = DAPI(
 @dapi.router.post('/create_type', response_model=TypeSchema)
 async def create_type(input: TypeSchema):
 	'''Creates a new type in the DAPI system using a name and JSON schema.'''
-	dapi.type_service.create(name=input.name, schema=input.schema)
+	await dapi.type_service.create(name=input.name, schema=input.schema)
 	return TypeSchema(name=input.name, schema=input.schema)
 
 @dapi.router.post('/get_type', response_model=TypeSchema)
 async def get_type(input: NameSchema):
 	'''Returns a single type definition by name.'''
-	record = dapi.type_service.get(input.name)
+	record = await dapi.type_service.get(input.name)
 	return TypeSchema(name=record['name'], schema=record['schema'])
 
 @dapi.router.post('/get_all_types', response_model=TypesSchema)
 async def get_all_types(input: EmptySchema):
 	'''Returns a list of all registered types with full definitions.'''
-	records = dapi.type_service.get_all()
+	records = await dapi.type_service.get_all()
 	return TypesSchema(items=[TypeSchema(name=r['name'], schema=r['schema']) for r in records])
 
 @dapi.router.post('/delete_type', response_model=StatusSchema)
 async def delete_type(input: NameSchema):
 	'''Removes a type from the system by name.'''
-	dapi.type_service.delete(input.name)
+	await dapi.type_service.delete(input.name)
 	return {'status': 'success'}
 	
 
@@ -90,30 +91,30 @@ async def create_operator(input: OperatorSchema):
 	'''Defines a new operator by name, input/output types, and executable code.'''
 	operator = OperatorSchema(**input.model_dump())
 	name = await dapi.operator_service.create(operator)
-	return dapi.operator_service.get(name)
+	return await dapi.operator_service.get(name)
 
 @dapi.router.post('/get_all_operators', response_model=OperatorsSchema)
 async def get_all_operators(input: EmptySchema):
 	'''Returns a list of all registered operators.'''
-	records = dapi.operator_service.get_all()
+	records = await dapi.operator_service.get_all()
 	return OperatorsSchema(items=records)
 
 @dapi.router.post('/delete_operator', response_model=StatusSchema)
 async def delete_operator(input: NameSchema):
 	'''Removes an operator from the system by name.'''
-	dapi.operator_service.delete(input.name)
+	await dapi.operator_service.delete(input.name)
 	return {'status': 'success'}
 
 @dapi.router.post('/get_operator', response_model=OperatorSchema)
 async def get_operator(input: NameSchema):
 	'''Returns a single operator by name.'''
-	return dapi.operator_service.get(input.name)
+	return await dapi.operator_service.get(input.name)
 
 @dapi.router.post('/invoke_operator', response_model=OutputSchema)
 async def invoke_operator(input: OperatorInputSchema):
 	result = await dapi.operator_service.invoke(input.name, input.input)
 	print(f"Invoke operator result: {result}")
-	return result
+	return OutputSchema(output=result)
 
 
 # TRANSACTION endpoints
@@ -122,25 +123,25 @@ async def invoke_operator(input: OperatorInputSchema):
 @dapi.router.post('/create_transaction', response_model=TransactionSchema)
 async def create_transaction(input: TransactionSchema):
 	'''Creates a transaction that wraps the invocation of a given operator.'''
-	tx_id = dapi.transaction_service.create(input)
+	tx_id = await dapi.transaction_service.create(input)
 	return TransactionSchema(id=tx_id, operator=input.operator)
 
 @dapi.router.post('/create_transaction_assignment', response_model=AssignmentSchema)
 async def create_transaction_assignment(input: AssignmentSchema):
 	'''Creates an assignment that transfers values into the transaction input.'''
-	assign = dapi.assignment_service.create(input)
+	assign = await dapi.assignment_service.create(input)
 	return AssignmentSchema(id=assign.id, **input.model_dump())
 
 @dapi.router.post('/get_all_transactions', response_model=TransactionsSchema)
 async def get_all_transactions(input: EmptySchema):
 	'''Returns a list of existing transactions (if not yet invoked).'''
-	records = dapi.transaction_service.get_all()
+	records = await dapi.transaction_service.get_all()
 	return TransactionsSchema(items=records)
 
 @dapi.router.post('/delete_transaction', response_model=StatusSchema)
 async def delete_transaction(input: IdSchema):
 	'''Removes a transaction from the system before it is invoked.'''
-	dapi.transaction_service.delete(input.id)
+	await dapi.transaction_service.delete(input.id)
 	return {'status': 'success'}
 
 @dapi.router.post('/invoke_transaction', response_model=OutputSchema)
@@ -157,6 +158,7 @@ async def invoke_transaction(input: TransactionInputSchema):
 async def create_function(input: FunctionSchema):
     '''Creates a function composite operator from transaction chain and shared scope.'''
     # TODO: ScopeService.create
+    result = await dapi.function_service.create(input)
     return FunctionSchema(**input.model_dump())
 
 
