@@ -1,7 +1,7 @@
 from fastapi                          import FastAPI
 from fastapi.middleware.cors  	      import CORSMiddleware
 
-from dapi.controllers.dapi_controller import dapi
+from dapi.controller import dapi
 
 
 app = FastAPI()

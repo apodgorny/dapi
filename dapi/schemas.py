@@ -75,7 +75,7 @@ class TransactionCreateSchema(BaseModel):
 	operator: str = Field(..., description='Operator to invoke')
 
 class TransactionSchema(BaseModel):
-	id      : str
+	id      : str = None
 	operator: str
 
 class TransactionsSchema(BaseModel):

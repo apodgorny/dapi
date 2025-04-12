@@ -24,7 +24,9 @@ class TypeService:
 		except DatumSchemaError as exc:
 			raise HTTPException(status_code=422, detail=str(exc))
 
-	def require(self, name: str) -> None:
+	def require(self, name: str) -> TypeTable:
+		if not name:
+			raise HTTPException(status_code=400, detail=f'Type name cannot be empty')
 		record = self.dapi.db.get(TypeTable, name)
 		if not record:
 			raise HTTPException(status_code=404, detail=f'Type `{name}` does not exist')
@@ -46,13 +48,14 @@ class TypeService:
 		return name
 
 	def get(self, name: str) -> dict:
-		return self.require(name).schema
+		record = self.require(name)
+		return {'name': record.name, 'schema': record.schema}
 
 	def get_all(self) -> list[dict]:
-		return [t.schema for t in self.dapi.db.query(TypeTable).all()]
+		types = self.dapi.db.query(TypeTable).all()
+		return [{'name': t.name, 'schema': t.schema} for t in types]
 
 	def delete(self, name: str) -> None:
 		record = self.require(name)
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()
-

@@ -1,5 +1,5 @@
 from dapi.lib.dapi import DAPI
-from dapi.services import TypeService, OperatorService
+from dapi.services import TypeService, OperatorService, TransactionService, AssignmentService, FunctionService, InterpreterService
 from dapi.schemas  import (
 	IdSchema,
     NameSchema,
@@ -14,6 +14,7 @@ from dapi.schemas  import (
 	
 	TransactionCreateSchema,
 	TransactionSchema,
+	TransactionsSchema,
 
 	AssignmentSchema,
 	AssignmentsSchema,
@@ -27,7 +28,11 @@ from dapi.schemas  import (
 
 dapi = DAPI(
 	TypeService,
-	OperatorService
+	OperatorService,
+	TransactionService,
+	AssignmentService,
+	FunctionService,
+	InterpreterService
 )
 
 # # Example dynamic operator
@@ -62,13 +67,13 @@ async def create_type(input: TypeSchema):
 async def get_type(input: NameSchema):
 	'''Returns a single type definition by name.'''
 	record = dapi.type_service.get(input.name)
-	return TypeInfoSchema(**record)
+	return TypeSchema(name=record['name'], schema=record['schema'])
 
 @dapi.router.post('/get_all_types', response_model=TypesSchema)
 async def get_all_types(input: EmptySchema):
 	'''Returns a list of all registered types with full definitions.'''
 	records = dapi.type_service.get_all()
-	return ListTypesOutputSchema(data=[TypeInfoSchema(**r) for r in records])
+	return TypesSchema(items=[TypeSchema(name=r['name'], schema=r['schema']) for r in records])
 
 @dapi.router.post('/delete_type', response_model=StatusSchema)
 async def delete_type(input: NameSchema):
@@ -87,11 +92,11 @@ async def create_operator(input: OperatorSchema):
 	name = await dapi.operator_service.create(operator)
 	return dapi.operator_service.get(name)
 
-@dapi.router.post('/list_operators', response_model=OperatorsSchema)
-async def list_operators(input: EmptySchema):
+@dapi.router.post('/get_all_operators', response_model=OperatorsSchema)
+async def get_all_operators(input: EmptySchema):
 	'''Returns a list of all registered operators.'''
 	records = dapi.operator_service.get_all()
-	return ListOperatorsOutputSchema(data=records)
+	return OperatorsSchema(items=records)
 
 @dapi.router.post('/delete_operator', response_model=StatusSchema)
 async def delete_operator(input: NameSchema):
@@ -114,23 +119,23 @@ async def invoke_operator(input: OperatorInputSchema):
 # TRANSACTION endpoints
 ###########################################################################
 
-@dapi.router.post('/create_transaction', response_model=TransactionCreateSchema)
+@dapi.router.post('/create_transaction', response_model=TransactionSchema)
 async def create_transaction(input: TransactionSchema):
 	'''Creates a transaction that wraps the invocation of a given operator.'''
 	tx_id = dapi.transaction_service.create(input)
-	return TransactionInfoSchema(id=tx_id, operator=input.operator)
+	return TransactionSchema(id=tx_id, operator=input.operator)
 
 @dapi.router.post('/create_transaction_assignment', response_model=AssignmentSchema)
 async def create_transaction_assignment(input: AssignmentSchema):
 	'''Creates an assignment that transfers values into the transaction input.'''
 	assign = dapi.assignment_service.create(input)
-	return AssignmentInfoSchema(id=assign.id, **input.model_dump())
+	return AssignmentSchema(id=assign.id, **input.model_dump())
 
-@dapi.router.post('/list_transactions', response_model=AssignmentsSchema)
-async def list_transactions(input: EmptySchema):
+@dapi.router.post('/get_all_transactions', response_model=TransactionsSchema)
+async def get_all_transactions(input: EmptySchema):
 	'''Returns a list of existing transactions (if not yet invoked).'''
 	records = dapi.transaction_service.get_all()
-	return AssignmentsSchema(data=records)
+	return TransactionsSchema(items=records)
 
 @dapi.router.post('/delete_transaction', response_model=StatusSchema)
 async def delete_transaction(input: IdSchema):
@@ -139,10 +144,10 @@ async def delete_transaction(input: IdSchema):
 	return {'status': 'success'}
 
 @dapi.router.post('/invoke_transaction', response_model=OutputSchema)
-async def invoke_transaction(input: OperatorInputSchema):
+async def invoke_transaction(input: TransactionInputSchema):
     '''Runs a transaction and returns its output; then deletes the transaction.'''
-    # TODO: TransactionService.invoke
-    return InvokeTransactionOutputSchema(output={'value': 42})
+    result = await dapi.transaction_service.invoke(input.name, input.input)
+    return OutputSchema(output=result)
 
 
 # FUNCTION endpoint
@@ -154,25 +159,11 @@ async def create_function(input: FunctionSchema):
     # TODO: ScopeService.create
     return FunctionSchema(**input.model_dump())
 
-# Dynamic operator handler - catches any /dapi/{operator_name} requests
+
+# DYNAMIC endpoint
+###########################################################################
+
 @dapi.router.post('/{operator_name}', include_in_schema=False)
-async def dynamic_operator_handler(operator_name: str, payload: dict):
+async def dynamic_operator_handler(operator_name: str, input: dict):
 	'''Generic handler for all dynamically created operators'''
-	print(f"Dynamic operator handler called for: {operator_name} with payload: {payload}")
-	
-	# Check if the operator exists in the database
-	try:
-		operator = dapi.operator_service.require(operator_name)
-		print(f"Found operator: {operator.name}")
-		
-		# For now, just implement a simple doubling operation for testing
-		if "value" in payload:
-			return {"value": payload["value"] * 2}
-		elif "number" in payload:
-			return {"number": payload["number"] * 2}
-		else:
-			return {"error": f"Input for operator {operator_name} missing 'value' or 'number' field"}
-	except Exception as e:
-		print(f"Error processing dynamic operator {operator_name}: {e}")
-		# raise HTTPException(status_code=404, detail=f"Operator {operator_name} not found or error: {str(e)}")
-		exit()
+	return await dapi.operator_service.invoke(operator_name, input)

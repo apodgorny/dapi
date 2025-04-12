@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
+import uuid
 
-from dapi.db                   import FunctionTable
-from dapi.schemas.function     import FunctionSchema
+from dapi.db     import FunctionTable
+from dapi.schemas import FunctionSchema
 
 
 class FunctionService:
@@ -29,13 +30,14 @@ class FunctionService:
 	def create(self, schema: FunctionSchema) -> str:
 		self.validate_name(schema.name)
 
-		# Ensure input/output types exist
-		if not self.dapi.type_service.has(schema.input_type):
-			raise HTTPException(status_code=404, detail=f'Type `{schema.input_type}` does not exist')
-		if not self.dapi.type_service.has(schema.output_type):
-			raise HTTPException(status_code=404, detail=f'Type `{schema.output_type}` does not exist')
-
-		record = FunctionTable(**schema.model_dump())
+		# Create FunctionTable record
+		record = FunctionTable(
+			id=str(uuid.uuid4()),
+			name=schema.name,
+			description="",
+			scope=schema.scope or {}
+		)
+		
 		self.dapi.db.add(record)
 		self.dapi.db.commit()
 

@@ -84,25 +84,6 @@ class OperatorService:
 
 		handler = await self._create_invoke_handler(schema)
 		
-		# print(f"Before define_operator_route for {schema.name}")
-		# input_schema = self.type_name_to_schema(schema.input_type)
-		# output_schema = self.type_name_to_schema(schema.output_type)
-		# print(f"Input schema: {input_schema}")
-		# print(f"Output schema: {output_schema}")
-
-		# # Register with define()
-		# try:
-		# 	self.dapi.define_operator_route(
-		# 		name           = schema.name,
-		# 		input_schema   = input_schema,
-		# 		output_schema  = output_schema,
-		# 		description    = schema.description,
-		# 		invoke_handler = handler
-		# 	)
-		# 	print(f"Route registered successfully for {schema.name}")
-		# except Exception as e:
-		# 	print(f"Error registering route for {schema.name}: {e}")
-
 		return schema.name
 
 	def get(self, name: str) -> dict:
@@ -126,10 +107,10 @@ class OperatorService:
 
 		input_datum.validate(raw_input)  # TODO: have validate take substring explaining what action was taken that produced error
 
-		output = interpreter.invoke(
+		result = interpreter.invoke(
 			code  = code,
 			input = input_datum
 		)
 
 		output_datum.validate(result)
-		return output_datum.to_dict()
+		return result
