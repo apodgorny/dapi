@@ -13,10 +13,11 @@ number_type = {
 Client.create_type('number_type', number_type)
 
 
+Client.delete_operator('square')
+
 # step 2: define the operator 'square'
-square_code = '''
-output = { 'x': {{input.x}} ** 2 }
-'''
+square_code = '{{output.x}} = {{input.x}} ** 2'
+
 Client.create_operator(
 	name        = 'square',
 	input_type  = 'number_type',
@@ -28,5 +29,7 @@ Client.create_operator(
 
 # step 3: directly invoke the operator
 input_data = { 'x': 7 }
+print('code:', square_code)
+print('input:', input_data)
 result     = Client.invoke('square', input_data)
 print('result:', result)

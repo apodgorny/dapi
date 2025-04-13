@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Example with Dicts and Lists",
+  "type": "object",
+  "properties": {
+    "name"     : { "type": "string" },
+    "age"      : { "type": "integer" },
+    "is_active": { "type": "boolean" },
+
+    "tags": {
+      "type" : "array",
+      "items": { "type": "string" }
+    },
+
+    "scores": {
+      "type" : "array",
+      "items": { "type": "integer" }
+    },
+
+    "flags": {
+      "type" : "array",
+      "items": { "type": "boolean" }
+    },
+
+    "preferences": {
+      "type"      : "object",
+      "properties": {
+        "newsletter" : { "type": "boolean" },
+        "theme"      : { "type": "string" },
+        "font_sizes" : {
+          "type" : "array",
+          "items": { "type": "integer" }
+        }
+      },
+      "required": ["newsletter", "theme"]
+    }
+  },
+  "required": ["name", "age", "is_active"]
+}

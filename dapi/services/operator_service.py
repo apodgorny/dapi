@@ -104,13 +104,15 @@ class OperatorService(DapiService):
 		output_schema = await self.dapi.type_service.get(operator.output_type)
 		interpreter   = await self.dapi.interpreter_service.require(operator.interpreter)
 
-		# Create datum objects from the schema and add data
-		input_datum = Datum(input_schema['schema']).from_dict(input)
+		input_datum   = Datum(input_schema['schema']).from_dict(input)
+		output_datum  = Datum(output_schema['schema'])
 		
 		try:
-			output = await interpreter.invoke(
-				code  = operator.code,
-				input = input_datum
+			result_datum = await interpreter.invoke(
+				operator_name = operator.name,
+				code          = operator.code,
+				input         = input_datum,
+				output        = output_datum
 			)
 		except Exception as e:
 			raise DapiException(
@@ -119,8 +121,5 @@ class OperatorService(DapiService):
 				severity    = DapiException.HALT
 			)
 
-		# Validate the output against the schema
-		output_datum = Datum(output_schema['schema'])
-		self.validate_data(output_datum, output, label='output')
-		
-		return output
+		self.validate_data(output_datum, result_datum.to_dict(), label='output')
+		return result_datum.to_dict()
