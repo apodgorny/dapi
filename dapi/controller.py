@@ -1,6 +1,6 @@
 from dapi.lib.dapi import Dapi
 from dapi.services import TypeService, OperatorService, TransactionService
-from dapi.services import AssignmentService, FunctionService, InterpreterService
+from dapi.services import AssignmentService, FunctionService, InterpreterService, InstanceService
 from dapi.schemas  import (
 	IdSchema,
     NameSchema,
@@ -18,9 +18,6 @@ from dapi.schemas  import (
 	TransactionsSchema,
 
 	AssignmentSchema,
-	AssignmentsSchema,
-
-	FunctionSchema,
 
 	OperatorInputSchema,
 	TransactionInputSchema,
@@ -33,7 +30,8 @@ dapi = Dapi(
 	TransactionService,
 	AssignmentService,
 	FunctionService,
-	InterpreterService
+	InterpreterService,
+	InstanceService
 )
 
 # # Example dynamic operator
@@ -114,7 +112,7 @@ async def get_operator(input: NameSchema):
 async def invoke_operator(input: OperatorInputSchema):
 	result = await dapi.operator_service.invoke(input.name, input.input)
 	print(f"Invoke operator result: {result}")
-	return OutputSchema(output=result)
+	return OutputSchema(output=result if isinstance(result, dict) else {})
 
 
 # TRANSACTION endpoints
@@ -144,22 +142,22 @@ async def delete_transaction(input: IdSchema):
 	await dapi.transaction_service.delete(input.id)
 	return {'status': 'success'}
 
-@dapi.router.post('/invoke_transaction', response_model=OutputSchema)
-async def invoke_transaction(input: TransactionInputSchema):
-    '''Runs a transaction and returns its output; then deletes the transaction.'''
-    result = await dapi.transaction_service.invoke(input.name, input.input)
-    return OutputSchema(output=result)
+# @dapi.router.post('/invoke_transaction', response_model=OutputSchema)
+# async def invoke_transaction(input: TransactionInputSchema):
+#     '''Runs a transaction and returns its output; then deletes the transaction.'''
+#     result = await dapi.transaction_service.invoke(input.name, input.input)
+#     return OutputSchema(output=result)
 
 
 # FUNCTION endpoint
 ###########################################################################
 
-@dapi.router.post('/create_function', response_model=FunctionSchema)
-async def create_function(input: FunctionSchema):
+@dapi.router.post('/create_function', response_model=OperatorSchema)
+async def create_function(input: OperatorSchema):
     '''Creates a function composite operator from transaction chain and shared scope.'''
     # TODO: ScopeService.create
     result = await dapi.function_service.create(input)
-    return FunctionSchema(**input.model_dump())
+    return OperatorSchema(**input.model_dump())
 
 
 # DYNAMIC endpoint

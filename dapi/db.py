@@ -1,189 +1,116 @@
 import os
-from typing import Any, Dict
-from dotenv import load_dotenv
+import uuid
+import enum
 
-from sqlalchemy     import JSON, String, Text, Integer, create_engine
-from sqlalchemy.orm import Mapped, mapped_column, declarative_base, sessionmaker
+from typing                         import Any, Dict
+from datetime                       import datetime
+
+from dotenv                         import load_dotenv
+from sqlalchemy                     import Column, Enum, String, Text, DateTime, create_engine
+from sqlalchemy.orm                 import Mapped, mapped_column, declarative_base, sessionmaker
+from sqlalchemy.ext.declarative     import DeclarativeMeta
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import JSON
 
 
 load_dotenv()
 
-################################################################################
-# DB_USER     = os.getenv('DB_USER')
-# DB_PASSWORD = os.getenv('DB_PASSWORD')
-# DB_HOST     = os.getenv('DB_HOST')
-# DB_PORT     = os.getenv('DB_PORT')
-# DB_NAME     = os.getenv('DB_NAME')
-
-# DB_URL       = f'postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
-# engine       = create_engine(DB_URL, echo=True)
-# SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-################################################################################
-
-DB_URL       = os.getenv('DB_URL')
-engine       = create_engine(DB_URL, connect_args={'check_same_thread': False}, echo=False)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-def get_db():
-	'''FastAPI-compatible dependency for DB session.'''
-	db = SessionLocal()
-	try:
-		yield db
-	finally:
-		db.close()
+DB_URL                = os.getenv('DB_URL')
+engine                = create_engine(DB_URL, connect_args={'check_same_thread': False}, echo=False)
+SessionLocal          = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base: DeclarativeMeta = declarative_base()
 
 
-Base = declarative_base()
+# Base model class
+#####################################################################
+
+class Record(Base):
+	__abstract__ = True
+	def to_dict(self) -> Dict[str, Any]:
+		result = {}
+		for c in self.__table__.columns:
+			value = getattr(self, c.name)
+			if isinstance(value, enum.Enum):
+				value = value.value
+			result[c.name] = value
+		return result
+
+	@classmethod
+	def from_dict(cls, data: Dict[str, Any]) -> 'TableBase':
+		return cls(**data)
 
 
-# db model for JSON schema types
-class TypeTable(Base):
+# JSON schema types
+#####################################################################
+
+class TypeRecord(Record):
 	__tablename__ = 'types'
 
 	name   : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique type name')
-	schema : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False,      comment='Full JSON Schema')
-
-	def __repr__(self) -> str:
-		return f'<TypeTable name={self.name!r}>'
-
-	def to_dict(self) -> Dict[str, Any]:
-		return {
-			'name'  : self.name,
-			'schema': self.schema,
-		}
-
-	@classmethod
-	def from_dict(cls, data: Dict[str, Any]) -> 'TypeTable':
-		return cls(name=data['name'], schema=data['schema'])
+	schema : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False,          comment='Full JSON Schema')
 
 
-# db model for operators (atomic static/dynamic/composite)
-class OperatorTable(Base):
+# Operators (atomic static/dynamic/composite)
+#####################################################################
+
+class OperatorRecord(Record):
 	__tablename__ = 'operators'
 
-	name         : Mapped[str]  = mapped_column(String(255), primary_key=True, comment='Unique operator name')
-	description  : Mapped[str]  = mapped_column(Text, nullable=True,            comment='Optional operator description')
-	code         : Mapped[str]  = mapped_column(Text, nullable=False,           comment='Source code or prompt')
-	interpreter  : Mapped[str]  = mapped_column(String(50), nullable=False,     comment='Interpreter name (e.g. python, llm)')
-	input_type   : Mapped[str]  = mapped_column(String(255), nullable=False,    comment='Input type name (foreign key to TypeTable)')
-	output_type  : Mapped[str]  = mapped_column(String(255), nullable=False,    comment='Output type name (foreign key to TypeTable)')
+	name         : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique operator name')
+	description  : Mapped[str]            = mapped_column(Text, nullable=True,           comment='Optional operator description')
+	code         : Mapped[str]            = mapped_column(Text, nullable=True,           comment='Source code or prompt (or empty for composite)')
+	interpreter  : Mapped[str]            = mapped_column(String(50), nullable=False,    comment='Interpreter name (e.g. python, llm, composite)')
+	input_type   : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Input type name (foreign key to TypeTable)')
+	output_type  : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Output type name (foreign key to TypeTable)')
+	meta         : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Optional metadata for interpreter configuration')
 
-	def __repr__(self) -> str:
-		return f'<OperatorTable name={self.name!r}>'
+class OperatorInstanceStatus(enum.Enum):
+	created = 'created'
+	running = 'running'
+	invoked = 'invoked'
+	error   = 'error'
 
-	def to_dict(self) -> Dict[str, Any]:
-		return {
-			'name'        : self.name,
-			'description' : self.description,
-			'code'        : self.code,
-			'interpreter' : self.interpreter,
-			'input_type'  : self.input_type,
-			'output_type' : self.output_type,
-		}
+class OperatorInstanceRecord(Record):
+	__tablename__ = 'runtime'
 
-	@classmethod
-	def from_dict(cls, data: Dict[str, Any]) -> 'OperatorTable':
-		return cls(
-			name         = data['name'],
-			description  = data.get('description'),
-			code         = data['code'],
-			interpreter  = data['interpreter'],
-			input_type   = data['input_type'],
-			output_type  = data['output_type'],
-		)
+	id          = Column(String(36),                  primary_key=True, default=lambda: str(uuid.uuid4()),     comment='Instance ID')
+	name        = Column(String,                       nullable=True,                                          comment='Optional instance name (used in composite scope)')
+	operator    = Column(String,                       nullable=False,                                         comment='Operator name this instance runs')
+
+	input       = Column(JSON,                         nullable=False,                                         comment='Input data for operator')
+	output      = Column(JSON,                         default=dict,                                           comment='Result of execution')
+
+	status      = Column(Enum(OperatorInstanceStatus), nullable=False, default=OperatorInstanceStatus.created, comment='Execution status')
+	error       = Column(Text,                         nullable=True,                                          comment='Error message if any')
+
+	children    = Column(JSON,                         default=list,                                           comment='IDs of child operator instances')
+
+	created_at  = Column(DateTime,                     default=datetime.utcnow,                                comment='Creation timestamp')
+	invoked_at  = Column(DateTime,                     nullable=True,                                          comment='Time of successful invocation')
 
 
-# db model for transactions (ephemeral until invoked)
-class TransactionTable(Base):
+# Transactions (ephemeral until invoked)
+#####################################################################
+
+class TransactionRecord(Record):
 	__tablename__ = 'transactions'
 
-	id           : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique transaction ID')
-	function_id  : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Owning function ID')
-	position     : Mapped[int]            = mapped_column(nullable=False,                comment='Order within function')
-	operator     : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Operator name (foreign key to OperatorTable)')
-	input        : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Current input payload')
-	output       : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Output (set after invoke)')
-
-	def __repr__(self) -> str:
-		return f'<TransactionTable id={self.id!r}>'
-
-	def to_dict(self) -> Dict[str, Any]:
-		return {
-			'id'         : self.id,
-			'function_id': self.function_id,
-			'position'   : self.position,
-			'operator'   : self.operator,
-			'input'      : self.input,
-			'output'     : self.output,
-		}
-
-	@classmethod
-	def from_dict(cls, data: Dict[str, Any]) -> 'TransactionTable':
-		return cls(
-			id          = data['id'],
-			function_id = data['function_id'],
-			position    = data['position'],
-			operator    = data['operator'],
-			input       = data.get('input'),
-			output      = data.get('output'),
-		)
+	id          : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique transaction ID')
+	name        : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Step name used in scope')
+	function_id : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Owning composite operator')
+	position    : Mapped[int]            = mapped_column(nullable=False,                comment='Order within composite')
+	operator    : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Operator to invoke')
+	input       : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Runtime input payload')
+	output      : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Runtime output after invoke')
 
 
-# db model for assignments (input wiring into transactions)
-class AssignmentTable(Base):
+# Assignments (input wiring into transactions)
+#####################################################################
+
+class AssignmentRecord(Record):
 	__tablename__ = 'assignments'
 
 	id             : Mapped[str] = mapped_column(String(255), primary_key=True, comment='Unique assignment ID')
 	transaction_id : Mapped[str] = mapped_column(String(255), nullable=False,   comment='Transaction ID (foreign key to TransactionTable)')
 	r_accessor     : Mapped[str] = mapped_column(String(255), nullable=False,   comment='Read accessor')
 	l_accessor     : Mapped[str] = mapped_column(String(255), nullable=False,   comment='Write accessor')
-
-	def __repr__(self) -> str:
-		return f'<AssignmentTable id={self.id!r}>'
-
-	def to_dict(self) -> Dict[str, Any]:
-		return {
-			'id'             : self.id,
-			'transaction_id' : self.transaction_id,
-			'r_accessor'     : self.r_accessor,
-			'l_accessor'     : self.l_accessor,
-		}
-
-	@classmethod
-	def from_dict(cls, data: Dict[str, Any]) -> 'AssignmentTable':
-		return cls(
-			id             = data['id'],
-			transaction_id = data['transaction_id'],
-			r_accessor     = data['r_accessor'],
-			l_accessor     = data['l_accessor'],
-		)
-
-
-# db model for functions (named composition of transactions)
-class FunctionTable(Base):
-	__tablename__ = 'functions'
-
-	id          : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique function ID')
-	name        : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='User-facing function name')
-	description : Mapped[str]            = mapped_column(Text, nullable=True,           comment='Optional description')
-	scope       : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Initial values injected into runtime scope')
-
-	def __repr__(self) -> str:
-		return f'<FunctionTable id={self.id!r}>'
-
-	def to_dict(self) -> Dict[str, Any]:
-		return {
-			'id'         : self.id,
-			'name'       : self.name,
-			'description': self.description,
-			'scope'      : self.scope,
-		}
-
-	@classmethod
-	def from_dict(cls, data: Dict[str, Any]) -> 'FunctionTable':
-		return cls(
-			id          = data['id'],
-			name        = data['name'],
-			description = data.get('description'),
-			scope       = data.get('scope'),
-		)

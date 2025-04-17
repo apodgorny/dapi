@@ -4,3 +4,4 @@ from .transaction_service import TransactionService
 from .assignment_service  import AssignmentService
 from .function_service    import FunctionService
 from .interpreter_service import InterpreterService
+from .instance_service    import InstanceService

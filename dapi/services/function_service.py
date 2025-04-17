@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import uuid
 
-from dapi.db        import FunctionTable
 from dapi.lib       import DapiService, DapiException
-from dapi.schemas   import FunctionSchema
+from dapi.schemas   import OperatorsSchema
+from dapi.db		import OperatorRecord
 
 
 @DapiService.wrap_exceptions()
@@ -17,26 +17,26 @@ class FunctionService(DapiService):
 	############################################################################
 
 	def validate_name(self, name: str) -> None:
-		if self.dapi.db.get(FunctionTable, name):
+		if self.dapi.db.get(OperatorRecord, name):
 			raise DapiException(status_code=400, detail=f'Function `{name}` already exists', severity=DapiException.BEWARE)
 
-	def require(self, name: str) -> FunctionTable:
-		record = self.dapi.db.get(FunctionTable, name)
+	def require(self, name: str) -> OperatorRecord:
+		record = self.dapi.db.get(OperatorRecord, name)
 		if not record:
 			raise DapiException(status_code=404, detail=f'Function `{name}` does not exist', severity=DapiException.HALT)
 		return record
 
 	############################################################################
 
-	async def create(self, schema: FunctionSchema) -> str:
+	async def create(self, schema: OperatorsSchema) -> str:
 		self.validate_name(schema.name)
 
-		# Create FunctionTable record
-		record = FunctionTable(
-			id=str(uuid.uuid4()),
-			name=schema.name,
-			description="",
-			scope=schema.scope or {}
+		# Create OperatorRecord record
+		record = OperatorRecord(
+			id          = str(uuid.uuid4()),
+			name        = schema.name,
+			description = '',
+			scope       = schema.scope or {}
 		)
 		
 		self.dapi.db.add(record)

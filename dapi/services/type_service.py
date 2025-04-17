@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dapi.db        import TypeTable
+from dapi.db        import TypeRecord
 from dapi.lib       import DatumSchemaError, Datum, DapiException, DapiService
 
 
@@ -8,13 +8,8 @@ from dapi.lib       import DatumSchemaError, Datum, DapiException, DapiService
 class TypeService(DapiService):
 	'''Service for managing JSON Schema types via SQLAlchemy.'''
 
-	def __init__(self, dapi):
-		self.dapi = dapi
-
-	############################################################################
-
 	def validate_name(self, name: str) -> None:
-		if self.dapi.db.get(TypeTable, name):
+		if self.dapi.db.get(TypeRecord, name):
 			raise DapiException(status_code=400, detail=f'Type `{name}` already exists', severity=DapiException.BEWARE)
 
 	def validate_jsonschema(self, schema):
@@ -23,10 +18,10 @@ class TypeService(DapiService):
 		except DatumSchemaError as exc:
 			raise DapiException(status_code=422, detail=str(exc))
 
-	def require(self, name: str) -> TypeTable:
+	def require(self, name: str) -> TypeRecord:
 		if not name:
 			raise DapiException(status_code=400, detail=f'Type name cannot be empty')
-		record = self.dapi.db.get(TypeTable, name)
+		record = self.dapi.db.get(TypeRecord, name)
 		if not record:
 			raise DapiException(status_code=404, detail=f'Type `{name}` does not exist')
 		return record
@@ -34,13 +29,13 @@ class TypeService(DapiService):
 	############################################################################
 
 	async def has(self, name: str) -> bool:
-		return bool(self.dapi.db.get(TypeTable, name))
+		return bool(self.dapi.db.get(TypeRecord, name))
 
 	async def create(self, name: str, schema: dict) -> str:
 		self.validate_name(name)
 		self.validate_jsonschema(schema)
 
-		record = TypeTable(name=name, schema=schema)
+		record = TypeRecord(name=name, schema=schema)
 
 		self.dapi.db.add(record)
 		self.dapi.db.commit()
@@ -51,7 +46,7 @@ class TypeService(DapiService):
 		return {'name': record.name, 'schema': record.schema}
 
 	async def get_all(self) -> list[dict]:
-		types = self.dapi.db.query(TypeTable).all()
+		types = self.dapi.db.query(TypeRecord).all()
 		return [{'name': t.name, 'schema': t.schema} for t in types]
 
 	async def delete(self, name: str) -> None:
