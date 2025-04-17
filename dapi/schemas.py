@@ -26,6 +26,7 @@ from enum     import Enum
 class InterpreterEnum(str, Enum):
 	python   = 'python'
 	llm      = 'llm'
+	plugin   = 'plugin'   # Executes plugin classes that implement Operator
 	function = 'function'  # Executes a list of transactions defined in meta.definition
 
 

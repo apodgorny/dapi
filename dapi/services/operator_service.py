@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pydantic       import BaseModel
 from typing         import Any, Dict
 from datetime       import datetime
@@ -7,16 +8,50 @@ from datetime       import datetime
 from dapi.db        import OperatorRecord, TransactionRecord
 from dapi.lib       import Datum, DatumSchemaError, DapiService, DapiException
 from dapi.schemas   import OperatorSchema
+from dapi.lib.module    import Module
+from dapi.lib.operator  import Operator
 
+
+OPERATOR_DIR = os.path.join(
+	os.environ.get('PROJECT_PATH'),
+	os.environ.get('OPERATOR_DIR', 'operators')
+)
 
 @DapiService.wrap_exceptions({DatumSchemaError: (400, 'halt')})
 class OperatorService(DapiService):
-	'''Service for managing operators: atomic_static, atomic_dynamic, function.'''
+	'''Service for managing operators: atomic_static, atomic_dynamic, function, plugin.'''
 
 	def __init__(self, dapi):
 		self.dapi = dapi
 
 	############################################################################
+
+	async def register_plugin_operators(self):
+		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
+
+		for name, cls in classes.items():
+			input_type  = getattr(cls, 'input_type', None)
+			output_type = getattr(cls, 'output_type', None)
+
+			if not input_type or not output_type:
+				continue
+
+			schema = OperatorSchema(
+				name         = name,
+				interpreter  = 'plugin',
+				input_type   = input_type,
+				output_type  = output_type,
+				code         = '',
+				meta         = None,
+				description  = (cls.__doc__ or '').strip() or None
+			)
+
+			try:
+				await self.create(schema)
+			except DapiException as e:
+				if e.detail.get('severity') == 'beware':
+					continue
+				raise
 
 	async def get_input_datum(self, name: str) -> Datum:
 		operator = self.dapi.db.get(OperatorRecord, name)
@@ -72,10 +107,10 @@ class OperatorService(DapiService):
 			datum.validate(data)
 		except Exception as e:
 			raise DapiException(
-            	status_code = 400,
-            	detail      = f'Invalid {label} data: {str(e)}',
-            	severity    = DapiException.HALT
-            )
+				status_code = 400,
+				detail      = f'Invalid {label} data: {str(e)}',
+				severity    = DapiException.HALT
+			)
 
 	async def validate_interpreter(self, interpreter):
 		if not await self.dapi.interpreter_service.has(interpreter):
@@ -87,11 +122,9 @@ class OperatorService(DapiService):
 
 	def validate_function(self, schema: OperatorSchema) -> None:
 		'''For function operators, just validate they have the correct interpreter.'''
-		# No validation needed for transactions as they'll be set later
 		pass
 
 	def validate_transactions_exist(self, ids: list[str], *, function_name: str = '<unknown>') -> None:
-		'''Ensure all referenced transaction IDs exist.'''
 		missing = [tx for tx in ids if not self.dapi.db.get(TransactionRecord, tx)]
 		if missing:
 			raise DapiException(
@@ -100,7 +133,6 @@ class OperatorService(DapiService):
 				severity    = DapiException.HALT
 			)
 
-    # Methods exposed to controller
 	############################################################################
 
 	async def create(self, schema: OperatorSchema) -> str:
@@ -130,42 +162,29 @@ class OperatorService(DapiService):
 		self.dapi.db.commit()
 
 	async def set_transactions(self, name: str, transaction_ids: list[str]) -> None:
-		'''Update the transaction list for a function operator.'''
-		# Get the operator record from database
-		operator = self.dapi.db.query(OperatorRecord).filter_by(name=name).first()
-		if not operator:
+		if not (operator := self.dapi.db.query(OperatorRecord).filter_by(name=name).first()):
 			raise DapiException(
 				status_code = 404,
 				detail      = f'Operator `{name}` does not exist',
 				severity    = DapiException.HALT
 			)
-		
-		# Verify it's a function
+
 		if operator.interpreter != 'function':
 			raise DapiException(
 				status_code = 400,
 				detail      = f'Operator `{name}` is not a function operator',
 				severity    = DapiException.HALT
 			)
-		
-		# Validate all transaction IDs exist
+
 		self.validate_transactions_exist(transaction_ids, function_name=name)
-		
-		# Update the transactions field directly
 		operator.transactions = transaction_ids
-		
-		# Force a commit
 		self.dapi.db.commit()
 
 	async def invoke(self, name: str, input: dict) -> dict:
-		'''Invoke an operator by creating and executing an instance.'''
-
 		operator  = self.require(name)
-
-		instance = await self.dapi.instance_service.create(
+		instance  = await self.dapi.instance_service.create(
 			operator_name = name,
 			input_data    = input
 		)
-
 		result = await self.dapi.instance_service.invoke(instance.id)
 		return result.output

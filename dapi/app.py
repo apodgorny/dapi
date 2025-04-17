@@ -1,9 +1,11 @@
+import os
 from fastapi                          import FastAPI
 from fastapi.middleware.cors  	      import CORSMiddleware
 
 from dapi.controller import dapi
+from dapi.middleware import enhance_openapi_schema
 
-
+os.environ['PROJECT_PATH'] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 app = FastAPI()
 
 app.add_middleware(
@@ -13,9 +15,10 @@ app.add_middleware(
 	allow_methods=['*'],
 	allow_headers=['*'],
 )
+app.middleware('http')(enhance_openapi_schema)
 
 dapi.start(app)
 
 @app.get('/')
 async def root():
-	return { 'message': 'It works' }
+	return { 'message': 'DAPI is awesome.' }

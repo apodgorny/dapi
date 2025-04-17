@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dapi.lib          import DapiService, DapiException
-from dapi.interpreters import PythonInterpreter, LLMInterpreter
+from dapi.interpreters import PythonInterpreter, LLMInterpreter, PluginInterpreter
 from dapi.lib.datum    import Datum
 
 
@@ -14,6 +14,7 @@ class InterpreterService(DapiService):
 		self.interpreters = {
 			'python'   : PythonInterpreter(),
 			'llm'      : LLMInterpreter(),
+			'plugin'   : PluginInterpreter(),
 			'function' : None
 		}
 

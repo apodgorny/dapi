@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 import uuid
 
-from dapi.db        import TransactionRecord
+from dapi.db        import TransactionRecord, AssignmentRecord
 from dapi.lib       import DapiService, DapiException
 from dapi.schemas   import TransactionSchema, TransactionCreateSchema
 
@@ -56,7 +57,18 @@ class TransactionService(DapiService):
 			
 		if schema.operator != 'return':
 			self.dapi.operator_service.require(schema.operator)
-		self.validate_uniqueness(schema.name, schema.operator)
+		
+		# Check if a transaction with the same name and operator already exists
+		existing = self.dapi.db.query(TransactionRecord).filter_by(
+			name     = schema.name,
+			operator = schema.operator
+		).first()
+		
+		# If transaction already exists, update its ID and delete the old record
+		if existing:
+			schema.id = existing.id
+			self.dapi.db.delete(existing)
+			self.dapi.db.commit()
 
 		record = TransactionRecord(
 			id          = schema.id,
@@ -100,24 +112,28 @@ class TransactionService(DapiService):
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()
 		
-	# async def invoke(self, tx_id: str) -> dict:
-	# 	'''Invoke a transaction by ID, using its stored input.'''
-	# 	transaction = self.require(tx_id)
+	async def invoke(self, scope: Datum, transaction: TransactionRecord) -> str:
+		assignments = self.dapi.db.query(AssignmentRecord).filter_by(transaction_id=transaction.id).all()
+		for assignment in assignments:
+			l_accessor = assignment.l_accessor
+			r_accessor = assignment.r_accessor
+			if r_accessor not in scope:
+				raise ValueError(f'Accessor `{r_accessor}` not in scope')
+			scope[l_accessor] = scope[r_accessor]
 
-	# 	try:
-	# 		transaction.output = await self.dapi.operator_service.invoke(
-	# 			transaction.operator,
-	# 			transaction.input
-	# 		)
-	# 	except DapiException:
-	# 		raise
-	# 	except Exception as e:
-	# 		raise DapiException(
-	# 			status_code = 500,
-	# 			detail      = f'Error invoking transaction `{tx_id}`: {str(e)}',
-	# 			severity    = DapiException.HALT
-	# 		)
-	# 	finally:
-	# 		self.dapi.db.commit()
+			print(f'{l_accessor:<15} = {r_accessor:<20} | {json.dumps(scope[r_accessor])}')
 
-	# 	return transaction.output
+		if transaction.operator != 'return':
+			child = await self.dapi.instance_service.create(
+				operator_name = transaction.operator,
+				instance_name = transaction.name,
+				input_data    = scope[f'{transaction.name}.input']
+			)
+			result = await self.dapi.instance_service.invoke(child.id)
+			scope[f'{transaction.name}.output'] = result.output
+			return result.id
+		return None
+
+	async def invoke_by_name(self, function_name: str, transaction_name: str, scope: dict) -> str:
+		transaction = await self.get_by_name(transaction_name, function_name)
+		return await self.invoke(scope, transaction)
