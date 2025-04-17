@@ -17,19 +17,17 @@ class LLMInterpreter(Interpreter):
 		code          : str,
 		input         : Datum,
 		output        : Datum,
-		meta          : dict | None = None
+		config        : dict = {}
 	) -> Datum:
-
-		meta = meta or {}
-		model_id    = meta.get('model_id', 'ollama::gemma3:4b')
-		temperature = meta.get('temperature', 0.0)
-		role        = meta.get('role', 'user')
-		system      = meta.get('system')  # optional
+		# Default model settings with config overrides
+		model_id    = config.get('model_id',    'ollama::gemma3:4b')
+		temperature = config.get('temperature', 0.0)
+		role        = config.get('role',        'user')
+		system      = config.get('system',      None)
 
 		input_data  = input.to_dict()
 		input_paths = set(m.group(1) for m in re.finditer(r'\{\{\s*input\.([a-zA-Z0-9_.]+)\s*\}\}', code))
 
-		# Replace {{input.x}} → value
 		for path in input_paths:
 			if path not in input:
 				raise ValueError(f'Missing input path `{path}` in operator `{operator_name}`')

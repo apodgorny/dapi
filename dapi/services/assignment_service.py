@@ -31,6 +31,25 @@ class AssignmentService(DapiService):
 
 	############################################################################
 
+	def validate_unique_assignment(self, transaction_id: str, l_accessor: str, r_accessor: str, exclude_id: str = None) -> None:
+		"""Validate that the combination of transaction_id, l_accessor, and r_accessor is unique."""
+		query = self.dapi.db.query(AssignmentRecord).filter(
+			AssignmentRecord.transaction_id == transaction_id,
+			AssignmentRecord.l_accessor == l_accessor,
+			AssignmentRecord.r_accessor == r_accessor
+		)
+		
+		if exclude_id:
+			query = query.filter(AssignmentRecord.id != exclude_id)
+			
+		existing = query.first()
+		if existing:
+			raise DapiException(
+				status_code = 400,
+				detail      = f'Assignment with transaction_id={transaction_id}, l_accessor={l_accessor}, r_accessor={r_accessor} already exists',
+				severity    = DapiException.BEWARE
+			)
+
 	async def create(self, schema: AssignmentSchema) -> AssignmentRecord:
 		# Generate ID if not provided
 		if not schema.id:
@@ -40,6 +59,13 @@ class AssignmentService(DapiService):
 			
 		# Validate transaction exists
 		self.dapi.transaction_service.require(schema.transaction_id)
+		
+		# Validate uniqueness of transaction_id, l_accessor, r_accessor combination
+		self.validate_unique_assignment(
+			transaction_id = schema.transaction_id,
+			l_accessor     = schema.l_accessor,
+			r_accessor     = schema.r_accessor
+		)
 		
 		record = AssignmentRecord(**schema.model_dump())
 		self.dapi.db.add(record)

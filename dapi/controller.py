@@ -12,6 +12,7 @@ from dapi.schemas  import (
 	
 	OperatorSchema,
 	OperatorsSchema,
+	OperatorSetTransactionsSchema,
 	
 	TransactionCreateSchema,
 	TransactionSchema,
@@ -114,6 +115,12 @@ async def invoke_operator(input: OperatorInputSchema):
 	print(f"Invoke operator result: {result}")
 	return OutputSchema(output=result if isinstance(result, dict) else {})
 
+@dapi.router.post('/set_operator_transactions', response_model=StatusSchema)
+async def set_operator_transactions(input: OperatorSetTransactionsSchema):
+	'''Updates the transaction list for a function operator.'''
+	await dapi.operator_service.set_transactions(input.name, input.transaction_ids)
+	return {'status': 'success'}
+
 
 # TRANSACTION endpoints
 ###########################################################################
@@ -122,19 +129,28 @@ async def invoke_operator(input: OperatorInputSchema):
 async def create_transaction(input: TransactionSchema):
 	'''Creates a transaction that wraps the invocation of a given operator.'''
 	tx_id = await dapi.transaction_service.create(input)
-	return TransactionSchema(id=tx_id, operator=input.operator)
+	return TransactionSchema(id=tx_id, name=input.name, operator=input.operator)
 
 @dapi.router.post('/create_transaction_assignment', response_model=AssignmentSchema)
 async def create_transaction_assignment(input: AssignmentSchema):
 	'''Creates an assignment that transfers values into the transaction input.'''
 	assign = await dapi.assignment_service.create(input)
-	return AssignmentSchema(id=assign.id, **input.model_dump())
+	# Avoid duplicate id in the response
+	data = input.model_dump()
+	data['id'] = assign.id
+	return AssignmentSchema(**data)
 
 @dapi.router.post('/get_all_transactions', response_model=TransactionsSchema)
 async def get_all_transactions(input: EmptySchema):
 	'''Returns a list of existing transactions (if not yet invoked).'''
 	records = await dapi.transaction_service.get_all()
 	return TransactionsSchema(items=records)
+
+@dapi.router.post('/get_transaction', response_model=TransactionSchema)
+async def get_transaction(input: TransactionSchema):
+	'''Get a transaction by name and operator.'''
+	record = await dapi.transaction_service.get_by_name(input.name, input.operator)
+	return TransactionSchema(**record)
 
 @dapi.router.post('/delete_transaction', response_model=StatusSchema)
 async def delete_transaction(input: IdSchema):

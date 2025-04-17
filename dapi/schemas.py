@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, RootModel, Field, constr
 from datetime import datetime
 from typing   import Any, Dict, List, Literal
 from enum     import Enum
@@ -64,16 +64,21 @@ class FunctionDefinitionSchema(BaseModel):  # Matches structure of meta.definiti
 	scope        : Dict[str, Any] = Field(default_factory=dict, description='Initial runtime scope')
 
 class OperatorSchema(BaseModel):
-	name        : str             = Field(...,  description='Operator name')
-	input_type  : str             = Field(...,  description='Input type name')
-	output_type : str             = Field(...,  description='Output type name')
-	code        : str | None      = Field(None, description='Executable code (ignored for functions)')
-	description : str             = Field('',   description='Human‑readable description')
-	interpreter : InterpreterEnum = Field(...,  description='Execution backend')
-	meta        : dict | None     = Field(None, description='Interpreter-specific metadata')
+	name        : str             = Field(...,                  description='Operator name')
+	input_type  : str             = Field(...,                  description='Input type name')
+	output_type : str             = Field(...,                  description='Output type name')
+	code        : str | None      = Field(None,                 description='Executable code (ignored for functions)')
+	description : str             = Field('',                   description='Human‑readable description')
+	interpreter : InterpreterEnum = Field(...,                  description='Execution backend')
+	scope       : Dict[str, Any]  = Field(default_factory=dict, description='Runtime scope for function operators')
+	config      : Dict[str, Any]  = Field(default_factory=dict, description='Configuration passed to interpreter')
 
 class OperatorsSchema(BaseModel):
 	items: List[OperatorSchema]
+
+class OperatorSetTransactionsSchema(BaseModel):
+	name: str
+	transaction_ids: List[str]
 
 class OperatorInstanceSchema(BaseModel):
 	id         : str
@@ -85,6 +90,11 @@ class OperatorInstanceSchema(BaseModel):
 	children   : list[str] = Field(default_factory=list)
 	created_at : datetime = Field(default_factory=datetime.utcnow)
 	invoked_at : datetime | None = None
+
+class OperatorScopeSchema(RootModel[Dict[str, Any]]):
+	'''Validated dict-like object representing shared scope for a function.'''
+	pass
+
 
 
 # TRANSACTION schemas

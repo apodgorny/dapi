@@ -23,6 +23,20 @@ class TransactionService(DapiService):
 				detail      = f'Transaction `{tx_id}` already exists',
 				severity    = DapiException.BEWARE
 			)
+	
+	def validate_uniqueness(self, name: str, operator: str) -> None:
+		"""Check that no transaction exists with the same name and operator."""
+		transaction = self.dapi.db.query(TransactionRecord).filter_by(
+			name     = name,
+			operator = operator
+		).first()
+		
+		if transaction:
+			raise DapiException(
+				status_code = 400,
+				detail      = f'Transaction with name `{name}` for operator `{operator}` already exists',
+				severity    = DapiException.BEWARE
+			)
 
 	def require(self, tx_id: str) -> TransactionRecord:
 		record = self.dapi.db.get(TransactionRecord, tx_id)
@@ -40,12 +54,14 @@ class TransactionService(DapiService):
 		if not schema.id : schema.id = str(uuid.uuid4())
 		else             : self.validate_id(schema.id)
 			
-		self.dapi.operator_service.require(schema.operator)
+		if schema.operator != 'return':
+			self.dapi.operator_service.require(schema.operator)
+		self.validate_uniqueness(schema.name, schema.operator)
 
 		record = TransactionRecord(
 			id          = schema.id,
+			name        = schema.name,
 			operator    = schema.operator,
-			function_id = schema.function_id or None,
 			input       = None,
 			output      = None
 		)
@@ -58,6 +74,22 @@ class TransactionService(DapiService):
 	async def get(self, tx_id: str) -> dict:
 		record = self.require(tx_id)
 		return record.to_dict()
+
+	async def get_by_name(self, name: str, operator_name: str) -> dict:
+		"""Get a transaction by name and operator name."""
+		transaction = self.dapi.db.query(TransactionRecord).filter_by(
+			name     = name,
+			operator = operator_name
+		).first()
+		
+		if not transaction:
+			raise DapiException(
+				status_code = 404,
+				detail      = f'Transaction with name `{name}` for operator `{operator_name}` does not exist',
+				severity    = DapiException.HALT
+			)
+		
+		return transaction.to_dict()
 
 	async def get_all(self) -> list[dict]:
 		transactions = self.dapi.db.query(TransactionRecord).all()

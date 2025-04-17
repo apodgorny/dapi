@@ -6,11 +6,11 @@ from typing                         import Any, Dict
 from datetime                       import datetime
 
 from dotenv                         import load_dotenv
-from sqlalchemy                     import Column, Enum, String, Text, DateTime, create_engine
+from sqlalchemy                     import Column, Enum, String, Text, DateTime, create_engine, JSON
 from sqlalchemy.orm                 import Mapped, mapped_column, declarative_base, sessionmaker
 from sqlalchemy.ext.declarative     import DeclarativeMeta
+from sqlalchemy.ext.mutable         import MutableDict
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import JSON
 
 
 load_dotenv()
@@ -56,13 +56,15 @@ class TypeRecord(Record):
 class OperatorRecord(Record):
 	__tablename__ = 'operators'
 
-	name         : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique operator name')
-	description  : Mapped[str]            = mapped_column(Text, nullable=True,           comment='Optional operator description')
-	code         : Mapped[str]            = mapped_column(Text, nullable=True,           comment='Source code or prompt (or empty for composite)')
-	interpreter  : Mapped[str]            = mapped_column(String(50), nullable=False,    comment='Interpreter name (e.g. python, llm, composite)')
-	input_type   : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Input type name (foreign key to TypeTable)')
-	output_type  : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Output type name (foreign key to TypeTable)')
-	meta         : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Optional metadata for interpreter configuration')
+	name         : Mapped[str]             = mapped_column(String(255),                  primary_key=True, comment='Unique operator name')
+	description  : Mapped[str]             = mapped_column(Text,                         nullable=True,    comment='Optional operator description')
+	code         : Mapped[str]             = mapped_column(Text,                         nullable=True,    comment='Source code or prompt (or empty for composite)')
+	interpreter  : Mapped[str]             = mapped_column(String(50),                   nullable=False,   comment='Interpreter name (e.g. python, llm, composite)')
+	input_type   : Mapped[str]             = mapped_column(String(255),                  nullable=False,   comment='Input type name (foreign key to TypeTable)')
+	output_type  : Mapped[str]             = mapped_column(String(255),                  nullable=False,   comment='Output type name (foreign key to TypeTable)')
+	transactions : Mapped[list[str]]       = mapped_column(JSON,                         default=list,     comment='List of transaction IDs for function operators')
+	scope        : Mapped[Dict[str, Any]]  = mapped_column(MutableDict.as_mutable(JSON), default=dict,     comment='Runtime scope for function operators')
+	config       : Mapped[Dict[str, Any]]  = mapped_column(MutableDict.as_mutable(JSON), default=dict,     comment='Configuration passed to interpreter')
 
 class OperatorInstanceStatus(enum.Enum):
 	created = 'created'
@@ -97,8 +99,6 @@ class TransactionRecord(Record):
 
 	id          : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique transaction ID')
 	name        : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Step name used in scope')
-	function_id : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Owning composite operator')
-	position    : Mapped[int]            = mapped_column(nullable=False,                comment='Order within composite')
 	operator    : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Operator to invoke')
 	input       : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Runtime input payload')
 	output      : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Runtime output after invoke')

@@ -4,7 +4,7 @@ from pydantic       import BaseModel
 from typing         import Any, Dict
 from datetime       import datetime
 
-from dapi.db        import OperatorRecord
+from dapi.db        import OperatorRecord, TransactionRecord
 from dapi.lib       import Datum, DatumSchemaError, DapiService, DapiException
 from dapi.schemas   import OperatorSchema
 
@@ -86,32 +86,17 @@ class OperatorService(DapiService):
 			)
 
 	def validate_function(self, schema: OperatorSchema) -> None:
-		'''Ensure function operator contains valid meta.definition block.'''
-		name = schema.name
-		definition = (schema.meta or {}).get('definition')
-		txs = definition.get('transactions')
-		if not definition:
-			raise DapiException(
-				status_code = 400,
-				detail      = f'Function `{name}` must include `meta.definition`',
-				severity    = DapiException.HALT
-			)
-		if not isinstance(txs, list) or not all(isinstance(tx, str) for tx in txs):
-			raise DapiException(
-				status_code = 400,
-				detail      = f'Function `{name}` has invalid `meta.definition.transactions`: must be a list of strings',
-				severity    = DapiException.HALT
-			)
-
-		self.validate_transactions_exist(txs, function_name=schema.name)
+		'''For function operators, just validate they have the correct interpreter.'''
+		# No validation needed for transactions as they'll be set later
+		pass
 
 	def validate_transactions_exist(self, ids: list[str], *, function_name: str = '<unknown>') -> None:
 		'''Ensure all referenced transaction IDs exist.'''
-		missing = [tx for tx in ids if not self.dapi.db.get('transactions', tx)]
+		missing = [tx for tx in ids if not self.dapi.db.get(TransactionRecord, tx)]
 		if missing:
 			raise DapiException(
 				status_code = 404,
-				detail = f'Function `{function_name}` refers to missing transaction(s): {missing}',
+				detail      = f'Function `{function_name}` refers to missing transaction(s): {missing}',
 				severity    = DapiException.HALT
 			)
 
@@ -144,6 +129,34 @@ class OperatorService(DapiService):
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()
 
+	async def set_transactions(self, name: str, transaction_ids: list[str]) -> None:
+		'''Update the transaction list for a function operator.'''
+		# Get the operator record from database
+		operator = self.dapi.db.query(OperatorRecord).filter_by(name=name).first()
+		if not operator:
+			raise DapiException(
+				status_code = 404,
+				detail      = f'Operator `{name}` does not exist',
+				severity    = DapiException.HALT
+			)
+		
+		# Verify it's a function
+		if operator.interpreter != 'function':
+			raise DapiException(
+				status_code = 400,
+				detail      = f'Operator `{name}` is not a function operator',
+				severity    = DapiException.HALT
+			)
+		
+		# Validate all transaction IDs exist
+		self.validate_transactions_exist(transaction_ids, function_name=name)
+		
+		# Update the transactions field directly
+		operator.transactions = transaction_ids
+		
+		# Force a commit
+		self.dapi.db.commit()
+
 	async def invoke(self, name: str, input: dict) -> dict:
 		'''Invoke an operator by creating and executing an instance.'''
 
@@ -156,4 +169,3 @@ class OperatorService(DapiService):
 
 		result = await self.dapi.instance_service.invoke(instance.id)
 		return result.output
-  

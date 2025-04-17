@@ -15,7 +15,7 @@ class PythonInterpreter(Interpreter):
 		code          : str,
 		input         : Datum,
 		output        : Datum,  # empty datum, just the schema
-		meta          : dict | None = None  # additional operator-level info
+		config        : dict = {}
 	) -> Datum:
 
 		# Collect paths referenced as {{input.x}} or {{output.y}}
@@ -37,7 +37,7 @@ class PythonInterpreter(Interpreter):
 		safe_globals = {
 			'input'  : input_struct,
 			'output' : output_struct,
-			'meta'   : meta or {}
+			'config' : config
 		}
 
 		# Execute and return
