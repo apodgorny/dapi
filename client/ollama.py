@@ -23,7 +23,7 @@ Client.create_operator(
 	output_type = 'number_type',
 	code        = cube_code,
 	interpreter = 'llm',
-	meta        = {
+	config      = {
 		'model_id': 'ollama::gemma3:4b',
 		'temperature': 0.0
 	}

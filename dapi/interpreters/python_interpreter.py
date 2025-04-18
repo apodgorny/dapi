@@ -1,51 +1,31 @@
-import re
-from dapi.lib   import Datum, Interpreter
-from dapi.lib.struct import Struct
+from dapi.lib            import Datum, Interpreter
+from dapi.lib.struct     import Struct
+from dapi.lib.mini_python import MiniPython
 
 
 class PythonInterpreter(Interpreter):
 	'''
-    Interprets free-form Python with templated I/O.  
-    Access input/output as objects with dot notation.
-    '''
+	Executes MiniPython operator code synchronously with no external calls.
+	'''
+
+	def __init__(self, dapi=None):
+		self.dapi = dapi
 
 	async def invoke(
 		self,
 		operator_name : str,
 		code          : str,
 		input         : Datum,
-		output        : Datum,  # empty datum, just the schema
+		output        : Datum,
 		config        : dict = {}
 	) -> Datum:
-
-		# Collect paths referenced as {{input.x}} or {{output.y}}
-		input_paths  = set(m.group(1) for m in re.finditer(r'\{\{\s*input\.([a-zA-Z0-9_.]+)\s*\}\}',  code))
-
-		# Validate input paths exist (skip output)
-		for path in input_paths:
-			if path not in input:
-				raise ValueError(f'Invalid input path `{path}` in operator `{operator_name}`')
-
-		# Remove all {{ ... }} wrappers to expose plain expressions
-		code = re.sub(r'\{\{\s*(.*?)\s*\}\}', r'\1', code)
-
-		# Wrap input/output as Structs
-		input_struct  = Struct.from_dict(input.to_dict())
-		output_struct = Struct.from_dict(output.to_dict())
-
-		# Prepare global scope
-		safe_globals = {
-			'input'  : input_struct,
-			'output' : output_struct,
-			'config' : config
-		}
-
-		# Execute and return
 		try:
-			exec(compile(code, operator_name, 'exec'), safe_globals)
-			output.from_dict(output_struct.to_dict())
-			return output if not output.is_empty() else input
-		except SyntaxError as e:
-			raise ValueError(f'Syntax error in `{operator_name}`: {e}')
+			raw = MiniPython(
+				{operator_name: code}
+			).call_operator(operator_name, input.to_dict())
 		except Exception as e:
-			raise ValueError(f'Runtime error in `{operator_name}`: {e}')
+			import traceback
+			raise ValueError(f'Runtime error in `{operator_name}`:\n{traceback.format_exc()}') from e
+
+		output.from_dict(raw)
+		return output if not output.is_empty() else input

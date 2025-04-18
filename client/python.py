@@ -6,7 +6,7 @@ number_type = {
 	'title'     : 'number_type',
 	'type'      : 'object',
 	'properties': {
-		'x': { 'type': 'number' }
+		'x': { 'type': 'integer' }
 	},
 	'required': ['x']
 }
@@ -14,7 +14,11 @@ Client.create_type('number_type', number_type)
 
 # Client.delete_operator('square')
 
-square_code = '{{output.x}} = {{input.x}} ** 2'
+square_code = '''
+def square(input):
+	x = input['x']
+	return {'x': x * x}
+'''
 
 Client.create_operator(
 	name        = 'square',

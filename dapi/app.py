@@ -21,4 +21,8 @@ dapi.start(app)
 
 @app.get('/')
 async def root():
-	return { 'message': 'DAPI is awesome.' }
+	import json
+	return {
+		'message': 'DAPI is awesome.',
+		'operators': await dapi.operator_service.get_operator_sources()
+	}

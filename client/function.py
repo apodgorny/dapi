@@ -1,76 +1,55 @@
 from lib.client import Client
 
+
+# Step 1: define a type for numbers
 number_type = {
 	'title'     : 'number_type',
 	'type'      : 'object',
 	'properties': {
-		'x': { 'type': 'number' }
+		'x': { 'type': 'integer' }
 	},
 	'required': ['x']
 }
 Client.create_type('number_type', number_type)
 
-# Client.delete_operator('cube')
 
+# Step 2: define operator: square
+square_code = '''
+def square(input):
+	x = input['x']
+	return {'x': x * x}
+'''
 Client.create_operator(
 	name        = 'square',
 	input_type  = 'number_type',
 	output_type = 'number_type',
-	code        = '{{output.x}} = {{input.x}} ** 2',
-	interpreter = 'python'
+	code        = square_code,
+	interpreter = 'python',
 )
 
-# Client.create_operator(
-# 	name        = 'cube',
-# 	input_type  = 'number_type',
-# 	output_type = 'number_type',
-# 	code        = 'Given a number {{input.x}}, return its cube as { "x": input.x ** 3 }',
-# 	interpreter = 'llm',
-# 	config      = {
-# 		'model_id'    : 'ollama::gemma3:4b',
-# 		'temperature' : 0.0,
-# 		'system'      : 'You are a helpful math assistant'
-# 	}
-# )
 
+# Step 3: define operator: double_then_square (calls square inside)
+combo_code = '''
+def double_then_square(input):
+	doubled = input['x'] * 2
+	squared = square({'x': doubled})
+	return {'x': squared['x']}
+'''
 Client.create_operator(
-	name        = 'cube',
+	name        = 'double_then_square',
 	input_type  = 'number_type',
 	output_type = 'number_type',
-	code        = '{{output.x}} = {{input.x}} ** 3',
-	interpreter = 'python'
+	code        = combo_code,
+	interpreter = 'python',
 )
 
-Client.create_operator(
-	name        = 'square_then_cube',
-	input_type  = 'number_type',
-	output_type = 'number_type',
-	code        = '', 
-	interpreter = 'function',
-	scope       = {}
-)
 
-# Create transactions, get fresh transaction records each time
-square_tx = Client.create_transaction('square1', 'square')
-cube_tx = Client.create_transaction('cube1', 'cube')
-return_tx = Client.create_transaction('this', 'return')
+# Step 4: invoke the combined operator
+input_data = { 'x': 3 }
+print('code:', combo_code)
+print('input:', input_data)
+result = Client.invoke('double_then_square', input_data)
+print('result:', result)
 
-
-Client.assign(square_tx['id'], 'square1.input.x', 'this.input.x')  
-Client.assign(cube_tx['id'],   'cube1.input.x',   'square1.output.x')
-Client.assign(return_tx['id'], 'this.output.x',   'cube1.output.x')
-
-Client.set_operator_transactions('square_then_cube', [square_tx['id'], cube_tx['id'], return_tx['id']])
-
-# Step 4: Invoke the function with input data
-input_data = { 'x': 10 }
-print('Input:', input_data)
-result = Client.invoke('square_then_cube', input_data)
-print('Result:', result)
-
-# # Direct operator invocation for comparison
-# print('\nDirect operator invocations:')
-# square_result = Client.invoke('square', input_data)
-# print('Square result:', square_result)
-# cube_result = Client.invoke('cube', input_data)
-# print('Cube result:', cube_result)
+expected_result = {'x': (input_data['x'] * 2) ** 2}
+print('expected result:', expected_result)

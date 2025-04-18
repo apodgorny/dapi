@@ -3,6 +3,11 @@ import httpx
 
 class Client:
 	base_url = 'http://localhost:8000/dapi'
+	
+	@staticmethod
+	def print(*args, **kwargs):
+		kwargs['flush'] = True
+		print(*args, **kwargs)
 
 	@staticmethod
 	def _color(severity):
@@ -19,18 +24,31 @@ class Client:
 
 	@staticmethod
 	def success(message):
-		print(f"{Client._color('success')}✓ {message}{Client._reset()}")
+		Client.print(f"{Client._color('success')}✓ {message}{Client._reset()}")
 
 	@staticmethod
 	def error(severity, message):
 		color = Client._color(severity)
-		print(f'{color}{severity.upper()}{Client._reset()}: \x1B[3m{message}\x1B[0m')
+		Client.print(f'{color}{severity.upper()}{Client._reset()}: \x1B[3m{message}\x1B[0m')
 		if severity == 'halt':
 			exit(1)
 
 	@staticmethod
 	def request(method: str, path: str, **kwargs):
+		Client.print('-' * 40)
+		Client.print(f'Calling `{path}`')
+		
+		# Print request parameters if they exist
+		if 'json' in kwargs:
+			for key, val in kwargs['json'].items():
+				Client.print(f'  {key:<14}: `{val}`')
+		print()
 		url = f'{Client.base_url}/{path.lstrip("/")}'
+		
+		# Set 2-minute timeout if not specified
+		if 'timeout' not in kwargs:
+			kwargs['timeout'] = 120.0  # 2 minutes in seconds
+			
 		try:
 			res = httpx.request(method, url, **kwargs)
 			res.raise_for_status()
@@ -42,15 +60,15 @@ class Client:
 				severity = detail.get('severity', 'halt')
 				Client.error(severity, message)
 			except Exception:
-				print('Error:', e.response.text)
+				Client.print('Error:', e.response.text)
 
 	############################################################################
 
 	@staticmethod
 	def create_type(name: str, schema: dict):
 		res = Client.request('POST', '/create_type', json={
-			'name'       : name,
-			'json_schema': schema
+			'name'  : name,
+			'schema': schema
 		})
 		Client.success(f'type `{name}` created')
 		return res
@@ -66,14 +84,18 @@ class Client:
 		return Client.request('GET', '/list_types')
 
 	@staticmethod
-	def create_operator(name, input_type, output_type, code, interpreter):
-		res = Client.request('POST', '/create_operator', json={
+	def create_operator(name, input_type, output_type, code, interpreter, config=None):
+		data = {
 			'name'       : name,
 			'input_type' : input_type,
 			'output_type': output_type,
 			'code'       : code,
 			'interpreter': interpreter
-		})
+		}
+		if config is not None:
+			data['config'] = config
+		
+		res = Client.request('POST', '/create_operator', json=data)
 		Client.success(f'operator `{name}` created')
 		return res
 

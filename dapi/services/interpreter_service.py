@@ -12,7 +12,7 @@ class InterpreterService(DapiService):
 	def __init__(self, dapi):
 		self.dapi = dapi
 		self.interpreters = {
-			'python'   : PythonInterpreter(),
+			'python'   : PythonInterpreter(dapi),
 			'llm'      : LLMInterpreter(),
 			'plugin'   : PluginInterpreter(),
 			'function' : None

@@ -26,6 +26,26 @@ class OperatorService(DapiService):
 
 	############################################################################
 
+	async def get_operator_sources(self) -> dict[str, Any]:
+		sources = {}
+
+		for record in await self.get_all():
+			name        = record['name']
+			interpreter = record['interpreter']
+			code        = record['code']
+
+			if interpreter == 'python':
+				sources[name] = code
+			else:
+				sources[name] = {
+					'type': interpreter,
+					'name': name
+				}
+
+		return sources
+
+	############################################################################
+
 	async def register_plugin_operators(self):
 		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
 
