@@ -8,7 +8,7 @@ from dapi.lib.model import Model
 class LLMInterpreter(Interpreter):
 	'''
     Interprets prompts with LLMs using {{input.x}} syntax. 
-    Uses `meta` to determine model, temperature, etc.
+    Uses `config` to determine model, temperature, etc.
     '''
 
 	async def invoke(
@@ -17,17 +17,19 @@ class LLMInterpreter(Interpreter):
 		code          : str,
 		input         : Datum,
 		output        : Datum,
-		config        : dict = {}
+		config        : dict | None = None
 	) -> Datum:
-		# Default model settings with config overrides
-		model_id    = config.get('model_id',    'ollama::gemma3:4b')
+
+		config      = config or {}
+		model_id    = config.get('model_id', 'ollama::gemma3:4b')
 		temperature = config.get('temperature', 0.0)
-		role        = config.get('role',        'user')
-		system      = config.get('system',      None)
+		role        = config.get('role', 'user')
+		system      = config.get('system')  # optional
 
 		input_data  = input.to_dict()
 		input_paths = set(m.group(1) for m in re.finditer(r'\{\{\s*input\.([a-zA-Z0-9_.]+)\s*\}\}', code))
 
+		# Replace {{input.x}} → value
 		for path in input_paths:
 			if path not in input:
 				raise ValueError(f'Missing input path `{path}` in operator `{operator_name}`')

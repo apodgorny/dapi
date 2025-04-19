@@ -1,5 +1,5 @@
 import ast
-from typing import Callable, Optional
+from typing import Callable, Optional, Awaitable
 
 
 class ExternalOperatorCall(Exception):
@@ -10,126 +10,164 @@ class ExternalOperatorCall(Exception):
 		super().__init__(f'External operator call: `{operator_name}`')
 
 
-class MiniPython(ast.NodeVisitor):
+class MiniPython:
 	def __init__(
 		self,
-		operator_sources       : dict[str, str],
-		call_operator_callback : Optional[Callable[[str, dict], dict]] = None
+		operators              : dict[str, str],
+		call_operator_callback : Optional[Callable[[str, dict], Awaitable[dict]]] = None
 	):
 		self.functions              = {}   # name -> FunctionDef
 		self.env_stack              = []   # call stack
 		self.call_operator_callback = call_operator_callback
+		self._root_operator_name    = None
+		self._was_called            = False  # Changed: flag to detect if top-level function was already executed
 
-		for name, code in operator_sources.items():
-			tree = ast.parse(code)
-			for node in tree.body:
-				if isinstance(node, ast.FunctionDef) and node.name == name:
-					self.functions[name] = node
+		for op in operators:
+			name = op['name']
+			code = op['code']
+			if op.get('interpreter') == 'python' and isinstance(code, str):
+				tree = ast.parse(code)
+				for node in tree.body:
+					if isinstance(node, ast.FunctionDef) and node.name == name:
+						self.functions[name] = node
+			else:
+				self.functions[name] = None  # Register non-Python operators
 
-	def call_operator(self, name: str, input_dict: dict) -> dict:
-		if name in self.functions:
-			self.env_stack.append({'input': input_dict})
-			try:
-				result = self.visit(self.functions[name])
-				if isinstance(result, dict):
-					return result
-				raise Exception(f'Function `{name}` did not return dict')
-			finally:
-				self.env_stack.pop()
+	async def call_operator(self, name: str, input_dict: dict) -> dict:
+		if not self.call_operator_callback:
+			raise Exception(f'Callback for external operators was not provided')
 
-		if self.call_operator_callback:
-			return self.call_operator_callback(name, input_dict)
+		# Check if this is a registered operator (Python or external)
+		if name not in self.functions:
+			raise Exception(f'Unknown function call `{name}` in operator `{self._root_operator_name}`')
+		
+		return await self.call_operator_callback(name, input_dict)
 
-		raise Exception(f'Function `{name}` not defined')
+	async def call_main(self, name: str, input_dict: dict) -> dict:
+		if self._was_called:
+			return await self.call_operator(name, input_dict)
 
-	def visit_FunctionDef(self, node):
-		for stmt in node.body:
-			ret = self.visit(stmt)
-			if isinstance(ret, dict):
-				return ret
+		if name not in self.functions:
+			raise Exception(f'Root function `{name}` not defined')
 
-	def visit_Return(self, node):
-		return self.visit(node.value)
+		self._was_called         = True
+		self._root_operator_name = name
 
-	def visit_Expr(self, node):
-		return self.visit(node.value)
+		self.env_stack.append({'input': input_dict})
+		try:
+			return await self.eval(self.functions[name])
+		finally:
+			self.env_stack.pop()
 
-	def visit_Call(self, node):
-		func_name = node.func.id
-		arg       = self.visit(node.args[0])
-		if not isinstance(arg, dict):
-			raise Exception(f'Argument to `{func_name}` must be dict')
-		return self.call_operator(func_name, arg)
-
-	def visit_Assign(self, node):
-		name                   = node.targets[0].id
-		value                  = self.visit(node.value)
-		self.env_stack[-1][name] = value
-
-	def visit_Name(self, node):
-		for scope in reversed(self.env_stack):
-			if node.id in scope:
-				return scope[node.id]
-		raise Exception(f'Variable `{node.id}` not found')
-
-	def visit_Constant(self, node):
-		return node.value
-
-	def visit_Subscript(self, node):
-		value = self.visit(node.value)
-		key   = self.visit(node.slice)
-		return value[key]
-
-	def visit_Dict(self, node):
-		return {
-			self.visit(k): self.visit(v)
-			for k, v in zip(node.keys, node.values)
-		}
-
-	def visit_BinOp(self, node):
-		left  = self.visit(node.left)
-		right = self.visit(node.right)
-		match node.op:
-			case ast.Add():  return left + right
-			case ast.Sub():  return left - right
-			case ast.Mult(): return left * right
-			case ast.Div():  return left / right
-			case ast.Mod():  return left % right
-			case _: raise Exception('Unsupported binary operation')
-
-	def visit_Compare(self, node):
-		left  = self.visit(node.left)
-		right = self.visit(node.comparators[0])
-		match node.ops[0]:
-			case ast.Lt():     return left < right
-			case ast.LtE():    return left <= right
-			case ast.Gt():     return left > right
-			case ast.GtE():    return left >= right
-			case ast.Eq():     return left == right
-			case ast.NotEq():  return left != right
-			case _: raise Exception('Unsupported comparison')
-
-	def visit_If(self, node):
-		if self.visit(node.test):
+	async def eval(self, node):
+		if isinstance(node, ast.FunctionDef):
 			for stmt in node.body:
-				ret = self.visit(stmt)
+				ret = await self.eval(stmt)
 				if isinstance(ret, dict):
 					return ret
+
+		elif isinstance(node, ast.Return):
+			return await self.eval(node.value)
+
+		elif isinstance(node, ast.Expr):
+			return await self.eval(node.value)
+
+		elif isinstance(node, ast.Call):
+			func_name = node.func.id
+			arg       = await self.eval(node.args[0])
+			if not isinstance(arg, dict):
+				raise Exception(f'Argument to `{func_name}` must be dict')
+			return await self.call_operator(func_name, arg)
+
+		elif isinstance(node, ast.Assign):
+			name  = node.targets[0].id
+			value = await self.eval(node.value)
+			self.env_stack[-1][name] = value
+
+		elif isinstance(node, ast.Name):
+			for scope in reversed(self.env_stack):
+				if node.id in scope:
+					return scope[node.id]
+			raise Exception(f'Variable `{node.id}` not found')
+
+		elif isinstance(node, ast.Constant):
+			return node.value
+
+		elif isinstance(node, ast.Subscript):
+			value = await self.eval(node.value)
+			key   = await self.eval(node.slice)
+			return value[key]
+
+		elif isinstance(node, ast.Dict):
+			return {
+				await self.eval(k): await self.eval(v)
+				for k, v in zip(node.keys, node.values)
+			}
+
+		elif isinstance(node, ast.BinOp):
+			left  = await self.eval(node.left)
+			right = await self.eval(node.right)
+			match node.op:
+				case ast.Add():  return left + right
+				case ast.Sub():  return left - right
+				case ast.Mult(): return left * right
+				case ast.Div():  return left / right
+				case ast.Mod():  return left % right
+				case _: raise Exception('Unsupported binary operation')
+
+		elif isinstance(node, ast.Compare):
+			left  = await self.eval(node.left)
+			right = await self.eval(node.comparators[0])
+			match node.ops[0]:
+				case ast.Lt():     return left < right
+				case ast.LtE():    return left <= right
+				case ast.Gt():     return left > right
+				case ast.GtE():    return left >= right
+				case ast.Eq():     return left == right
+				case ast.NotEq():  return left != right
+				case _: raise Exception('Unsupported comparison')
+
+		elif isinstance(node, ast.If):
+			if await self.eval(node.test):
+				for stmt in node.body:
+					ret = await self.eval(stmt)
+					if isinstance(ret, dict):
+						return ret
+			else:
+				for stmt in node.orelse:
+					ret = await self.eval(stmt)
+					if isinstance(ret, dict):
+						return ret
+
+		elif isinstance(node, ast.For):
+			iterable = await self.eval(node.iter)
+			var_name = node.target.id
+			for item in iterable:
+				self.env_stack[-1][var_name] = item
+				for stmt in node.body:
+					ret = await self.eval(stmt)
+					if isinstance(ret, dict):
+						return ret
+
+		elif isinstance(node, ast.UnaryOp):
+			operand = await self.eval(node.operand)
+			match node.op:
+				case ast.USub(): return -operand
+				case ast.UAdd(): return +operand
+				case ast.Not():  return not operand
+				case _: raise Exception('Unsupported unary operation')
+
+		elif isinstance(node, ast.BoolOp):
+			values = [await self.eval(v) for v in node.values]
+			if isinstance(node.op, ast.And): return all(values)
+			if isinstance(node.op, ast.Or):  return any(values)
+			raise Exception('Unsupported boolean operation')
+
+		elif isinstance(node, ast.List):
+			return [await self.eval(elt) for elt in node.elts]
+
+		elif isinstance(node, ast.Tuple):
+			return tuple(await self.eval(elt) for elt in node.elts)
+
 		else:
-			for stmt in node.orelse:
-				ret = self.visit(stmt)
-				if isinstance(ret, dict):
-					return ret
-
-	def visit_For(self, node):
-		iterable = self.visit(node.iter)
-		var_name = node.target.id
-		for item in iterable:
-			self.env_stack[-1][var_name] = item
-			for stmt in node.body:
-				ret = self.visit(stmt)
-				if isinstance(ret, dict):
-					return ret
-
-	def generic_visit(self, node):
-		raise Exception(f'Unsupported AST node: {type(node).__name__}')
+			raise Exception(f'Unsupported AST node: {type(node).__name__}')

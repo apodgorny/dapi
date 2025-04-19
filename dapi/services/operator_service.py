@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import asyncio
 from pydantic       import BaseModel
 from typing         import Any, Dict
 from datetime       import datetime
@@ -23,26 +24,6 @@ class OperatorService(DapiService):
 
 	def __init__(self, dapi):
 		self.dapi = dapi
-
-	############################################################################
-
-	async def get_operator_sources(self) -> dict[str, Any]:
-		sources = {}
-
-		for record in await self.get_all():
-			name        = record['name']
-			interpreter = record['interpreter']
-			code        = record['code']
-
-			if interpreter == 'python':
-				sources[name] = code
-			else:
-				sources[name] = {
-					'type': interpreter,
-					'name': name
-				}
-
-		return sources
 
 	############################################################################
 
@@ -201,10 +182,12 @@ class OperatorService(DapiService):
 		self.dapi.db.commit()
 
 	async def invoke(self, name: str, input: dict) -> dict:
+		print('[OPERATOR_SERVICE] Invoking', name, input)
 		operator  = self.require(name)
 		instance  = await self.dapi.instance_service.create(
 			operator_name = name,
 			input_data    = input
 		)
 		result = await self.dapi.instance_service.invoke(instance.id)
+		print(f'[OPERATOR_SERVICE] Invoked {name}. Result:', result.output)
 		return result.output

@@ -112,7 +112,7 @@ async def get_operator(input: NameSchema):
 @dapi.router.post('/invoke_operator', response_model=OutputSchema)
 async def invoke_operator(input: OperatorInputSchema):
 	result = await dapi.operator_service.invoke(input.name, input.input)
-	print(f"Invoke operator result: {result}")
+	# print(f"Invoke operator result: {result}")
 	return OutputSchema(output=result if isinstance(result, dict) else {})
 
 @dapi.router.post('/set_operator_transactions', response_model=StatusSchema)
