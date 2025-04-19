@@ -38,6 +38,8 @@ class DatumSchemaError(Exception):
 
 
 class Datum:
+	BaseModel = BaseModel
+	Pydantic  = BaseModel
 
 	############################################################################
 

@@ -1,19 +1,16 @@
-from lib.client import Client
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Create number type schema
-number_type = {
-	'title'     : 'number_type',
-	'type'      : 'object',
-	'properties': {
-		'x': { 'type': 'number' }
-	},
-	'required': ['x']
-}
+from client.lib.client import Client
+from dapi.lib.datum    import Datum
 
-# Create the type if it doesn't exist already
-Client.create_type('number_type', number_type)
+class NumberType(Datum.Pydantic):
+	x: float
 
-# Create the plugin operator
+Client.create_type('number_type', NumberType)
+
+##########################################################################################
+
 Client.create_operator(
 	name        = 'times_two',
 	input_type  = 'number_type',
@@ -23,8 +20,11 @@ Client.create_operator(
 	config      = {}  # Optional configuration if needed
 )
 
-# Test the plugin operator
+##########################################################################################
+
 input_data = {'x': 21}
 print('Input:', input_data)
 result = Client.invoke('times_two', input_data)
 print('Result:', result)
+expected_result = {'x': input_data['x'] * 2}
+print('Expected result:', expected_result)

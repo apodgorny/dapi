@@ -1,4 +1,7 @@
-import httpx
+import os, sys, httpx
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from dapi.lib import Datum
 
 
 class Client:
@@ -65,7 +68,8 @@ class Client:
 	############################################################################
 
 	@staticmethod
-	def create_type(name: str, schema: dict):
+	def create_type(name: str, model: Datum.Pydantic):
+		schema = Datum(model).to_dict(schema=True)
 		res = Client.request('POST', '/create_type', json={
 			'name'  : name,
 			'schema': schema

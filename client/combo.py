@@ -1,22 +1,16 @@
-import os
-from lib.client import Client
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-os.system('make clear')
+from client.lib.client import Client
+from dapi.lib.datum    import Datum
 
+class NumberType(Datum.Pydantic):
+	x: float
 
-# Тип данных: number_type
-number_type = {
-	'title'     : 'number_type',
-	'type'      : 'object',
-	'properties': {
-		'x': { 'type': 'number' }
-	},
-	'required': ['x']
-}
-Client.create_type('number_type', number_type)
+Client.create_type('number_type', NumberType)
 
+##########################################################################################
 
-# Оператор square (MiniPython)
 square_code = '''
 def square(input):
 	x = input['x']
@@ -30,9 +24,9 @@ Client.create_operator(
 	interpreter = 'python'
 )
 
-# Оператор cube (LLM/Ollama)
-cube_code = 'Given a number {{input.x}}, return its cube as { "x": {{input.x}} ** 3 }'
+##########################################################################################
 
+cube_code = 'Given a number {{input.x}}, return its cube as { "x": {{input.x}} ** 3 }'
 Client.create_operator(
 	name        = 'cube',
 	input_type  = 'number_type',
@@ -45,24 +39,8 @@ Client.create_operator(
 	}
 )
 
+##########################################################################################
 
-# # Оператор cube (Python)
-# cube_code = '''
-# def cube(input):
-# 	x = input['x']
-# 	return {'x': x * x * x}
-# '''
-
-# Client.create_operator(
-# 	name        = 'cube',
-# 	input_type  = 'number_type',
-# 	output_type = 'number_type',
-# 	code        = cube_code,
-# 	interpreter = 'python'
-# )
-
-
-# Оператор square_then_cube (комбинирует оба)
 combo_code = '''
 def square_then_cube(input):
 	sqr = square({'x': input['x']})
@@ -77,7 +55,7 @@ Client.create_operator(
 	interpreter = 'python'
 )
 
-
+##########################################################################################
 
 
 # Вызов

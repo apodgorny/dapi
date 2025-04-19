@@ -73,8 +73,15 @@ class MiniPython:
 			return await self.eval(node.value)
 
 		elif isinstance(node, ast.Call):
-			func_name = node.func.id
-			arg       = await self.eval(node.args[0])
+			# Handle both simple function calls and attribute lookups (e.g., module.function)
+			if isinstance(node.func, ast.Name):
+				func_name = node.func.id
+			elif isinstance(node.func, ast.Attribute):
+				func_name = node.func.attr
+			else:
+				raise Exception(f'Unsupported function call type: {type(node.func).__name__}')
+				
+			arg = await self.eval(node.args[0])
 			if not isinstance(arg, dict):
 				raise Exception(f'Argument to `{func_name}` must be dict')
 			return await self.call_operator(func_name, arg)
@@ -168,6 +175,22 @@ class MiniPython:
 
 		elif isinstance(node, ast.Tuple):
 			return tuple(await self.eval(elt) for elt in node.elts)
+
+		elif isinstance(node, ast.AugAssign):
+			# Handle augmented assignments (+=, -=, etc.)
+			name = node.target.id
+			value = self.env_stack[-1].get(name)
+			right = await self.eval(node.value)
+			
+			match node.op:
+				case ast.Add():  result = value + right
+				case ast.Sub():  result = value - right
+				case ast.Mult(): result = value * right
+				case ast.Div():  result = value / right
+				case ast.Mod():  result = value % right
+				case _: raise Exception('Unsupported augmented assignment operation')
+			
+			self.env_stack[-1][name] = result
 
 		else:
 			raise Exception(f'Unsupported AST node: {type(node).__name__}')

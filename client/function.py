@@ -1,19 +1,17 @@
-from lib.client import Client
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from client.lib.client import Client
+from dapi.lib.datum    import Datum
+
+class NumberType(Datum.Pydantic):
+	x: float
+
+Client.create_type('number_type', NumberType)
 
 
-# Step 1: define a type for numbers
-number_type = {
-	'title'     : 'number_type',
-	'type'      : 'object',
-	'properties': {
-		'x': { 'type': 'integer' }
-	},
-	'required': ['x']
-}
-Client.create_type('number_type', number_type)
+##########################################################################################
 
-
-# Step 2: define operator: square
 square_code = '''
 def square(input):
 	x = input['x']
@@ -27,8 +25,8 @@ Client.create_operator(
 	interpreter = 'python',
 )
 
+##########################################################################################
 
-# Step 3: define operator: double_then_square (calls square inside)
 combo_code = '''
 def double_then_square(input):
 	doubled = input['x'] * 2
@@ -44,7 +42,8 @@ Client.create_operator(
 )
 
 
-# Step 4: invoke the combined operator
+##########################################################################################
+
 input_data = { 'x': 3 }
 print('code:', combo_code)
 print('input:', input_data)
