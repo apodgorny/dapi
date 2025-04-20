@@ -10,7 +10,7 @@ class String:
 		)
 
 	@staticmethod
-	def dedent(text: str) -> str:
+	def unindent(text: str) -> str:
 		'''Removes common leading whitespace from all lines.'''
 		import textwrap
 		return textwrap.dedent(text)

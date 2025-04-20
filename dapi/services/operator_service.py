@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import os
-import asyncio
-from pydantic       import BaseModel
-from typing         import Any, Dict
-from datetime       import datetime
+import uuid
 
-from dapi.db        import OperatorRecord, TransactionRecord
-from dapi.lib       import Datum, DatumSchemaError, DapiService, DapiException
-from dapi.schemas   import OperatorSchema
-from dapi.lib.module    import Module
-from dapi.lib.operator  import Operator
+from dapi.db         import OperatorRecord
+from dapi.lib        import Datum, DapiService, DapiException, DatumSchemaError
+from dapi.schemas    import OperatorSchema
+from dapi.lib.module import Module
 
 
 OPERATOR_DIR = os.path.join(
@@ -18,9 +14,10 @@ OPERATOR_DIR = os.path.join(
 	os.environ.get('OPERATOR_DIR', 'operators')
 )
 
+
 @DapiService.wrap_exceptions({DatumSchemaError: (400, 'halt')})
 class OperatorService(DapiService):
-	'''Service for managing operators: atomic_static, atomic_dynamic, function, plugin.'''
+	'''Service for managing operators.'''
 
 	def __init__(self, dapi):
 		self.dapi = dapi
@@ -64,16 +61,7 @@ class OperatorService(DapiService):
 		type_record = await self.dapi.type_service.get(operator.output_type)
 		return Datum(type_record['schema'])
 
-	async def type_name_to_schema(self, type_name: str) -> type[BaseModel]:
-		schema_dict = await self.dapi.type_service.get(type_name)
-		try:
-			return Datum(schema_dict['schema']).schema
-		except DatumSchemaError as e:
-			raise DapiException(
-				status_code = 400,
-				detail      = str(e),
-				severity    = DapiException.HALT
-			)
+	############################################################################
 
 	def validate_name(self, name: str) -> None:
 		if self.dapi.db.get(OperatorRecord, name):
@@ -103,16 +91,6 @@ class OperatorService(DapiService):
 					severity    = DapiException.HALT
 				)
 
-	def validate_data(self, datum: Datum, data: dict, label: str = ''):
-		try:
-			datum.validate(data)
-		except Exception as e:
-			raise DapiException(
-				status_code = 400,
-				detail      = f'Invalid {label} data: {str(e)}',
-				severity    = DapiException.HALT
-			)
-
 	async def validate_interpreter(self, interpreter):
 		if not await self.dapi.interpreter_service.has(interpreter):
 			raise DapiException(
@@ -121,25 +99,9 @@ class OperatorService(DapiService):
 				severity    = DapiException.HALT
 			)
 
-	def validate_function(self, schema: OperatorSchema) -> None:
-		'''For function operators, just validate they have the correct interpreter.'''
-		pass
-
-	def validate_transactions_exist(self, ids: list[str], *, function_name: str = '<unknown>') -> None:
-		missing = [tx for tx in ids if not self.dapi.db.get(TransactionRecord, tx)]
-		if missing:
-			raise DapiException(
-				status_code = 404,
-				detail      = f'Function `{function_name}` refers to missing transaction(s): {missing}',
-				severity    = DapiException.HALT
-			)
-
 	############################################################################
 
 	async def create(self, schema: OperatorSchema) -> str:
-		if schema.interpreter == 'function':
-			self.validate_function(schema)
-
 		self.validate_name(schema.name)
 		await self.validate_io(schema)
 		await self.validate_interpreter(schema.interpreter)
@@ -162,32 +124,13 @@ class OperatorService(DapiService):
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()
 
-	async def set_transactions(self, name: str, transaction_ids: list[str]) -> None:
-		if not (operator := self.dapi.db.query(OperatorRecord).filter_by(name=name).first()):
-			raise DapiException(
-				status_code = 404,
-				detail      = f'Operator `{name}` does not exist',
-				severity    = DapiException.HALT
-			)
-
-		if operator.interpreter != 'function':
-			raise DapiException(
-				status_code = 400,
-				detail      = f'Operator `{name}` is not a function operator',
-				severity    = DapiException.HALT
-			)
-
-		self.validate_transactions_exist(transaction_ids, function_name=name)
-		operator.transactions = transaction_ids
-		self.dapi.db.commit()
-
 	async def invoke(self, name: str, input: dict) -> dict:
-		print('[OPERATOR_SERVICE] Invoking', name, input)
+		# print('[OPERATOR_SERVICE] Invoking', name)
 		operator  = self.require(name)
 		instance  = await self.dapi.instance_service.create(
 			operator_name = name,
 			input_data    = input
 		)
 		result = await self.dapi.instance_service.invoke(instance.id)
-		print(f'[OPERATOR_SERVICE] Invoked {name}. Result:', result.output)
+		# print(f'[OPERATOR_SERVICE] Invoked {name}')
 		return result.output

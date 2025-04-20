@@ -30,7 +30,6 @@ class ModelOllama(Model):
 		temperature     : float = 0.0,
 		system          : str | None = None
 	) -> dict:
-		print('Ollama call', locals())
 		params = {
 			"model": self.name,
 			"messages": [{

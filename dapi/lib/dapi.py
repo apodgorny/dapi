@@ -1,4 +1,4 @@
-import asyncio
+import asyncio, traceback
 from typing  import Any, Callable, Type, List, Dict
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -70,7 +70,7 @@ class DapiService:
 			elif isinstance(e, DapiException):
 				raise e
 			else:
-				raise DapiException(status_code=500, detail=f'Unhandled error: {str(e)}', severity='halt')
+				raise DapiException(status_code=500, detail=f'Unhandled error: {traceback.format_exc()}', severity='halt')
 		
 		def create_wrapper(method):
 			if asyncio.iscoroutinefunction(method):

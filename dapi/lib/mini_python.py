@@ -21,6 +21,7 @@ class MiniPython:
 		self.call_operator_callback = call_operator_callback
 		self._root_operator_name    = None
 		self._was_called            = False  # Changed: flag to detect if top-level function was already executed
+		self.allowed_builtins       = {'print', 'len'}  # Set of allowed built-in functions
 
 		for op in operators:
 			name = op['name']
@@ -80,10 +81,22 @@ class MiniPython:
 				func_name = node.func.attr
 			else:
 				raise Exception(f'Unsupported function call type: {type(node.func).__name__}')
-				
-			arg = await self.eval(node.args[0])
-			if not isinstance(arg, dict):
-				raise Exception(f'Argument to `{func_name}` must be dict')
+			
+			# Check if this is a built-in function we allow
+			if func_name in self.allowed_builtins:
+				# Evaluate all arguments
+				args = [await self.eval(arg) for arg in node.args]
+				# Call the built-in function directly
+				return __builtins__[func_name](*args)
+
+			# Regular operator call
+			if len(node.args) == 0:
+				# Handle function calls with no arguments
+				arg = {}
+			else:
+				arg = await self.eval(node.args[0])
+				if not isinstance(arg, dict):
+					raise Exception(f'Argument to `{func_name}` must be dict')
 			return await self.call_operator(func_name, arg)
 
 		elif isinstance(node, ast.Assign):
@@ -191,6 +204,28 @@ class MiniPython:
 				case _: raise Exception('Unsupported augmented assignment operation')
 			
 			self.env_stack[-1][name] = result
+			
+		elif isinstance(node, ast.JoinedStr):
+			# Handle f-strings
+			parts = []
+			for value in node.values:
+				if isinstance(value, ast.Constant):
+					parts.append(value.value)
+				elif isinstance(value, ast.FormattedValue):
+					formatted_value = await self.eval(value.value)
+					parts.append(str(formatted_value))
+				else:
+					raise Exception(f'Unsupported node in f-string: {type(value).__name__}')
+			return ''.join(parts)
+			
+		elif isinstance(node, ast.FormattedValue):
+			# Evaluate the value in a FormattedValue
+			return str(await self.eval(node.value))
+			
+		elif isinstance(node, ast.Attribute):
+			# Handle attribute access (e.g., obj.attribute)
+			value = await self.eval(node.value)
+			return value[node.attr] if isinstance(value, dict) else getattr(value, node.attr)
 
 		else:
 			raise Exception(f'Unsupported AST node: {type(node).__name__}')

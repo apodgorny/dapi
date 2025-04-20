@@ -1,12 +1,17 @@
-import os, sys, httpx
+import os, sys, httpx, json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dapi.lib import Datum
+from .datum  import Datum
+from .code   import Code
+from .module import Module
+
+PROJECT_PATH = os.environ.get('PROJECT_PATH')
+DAPI_CODE    = os.path.join(PROJECT_PATH, os.environ.get('DAPI_CODE'))
+DAPI_URL     = os.environ.get('DAPI_URL')
 
 
 class Client:
-	base_url = 'http://localhost:8000/dapi'
-	
+
 	@staticmethod
 	def print(*args, **kwargs):
 		kwargs['flush'] = True
@@ -31,7 +36,8 @@ class Client:
 
 	@staticmethod
 	def error(severity, message):
-		color = Client._color(severity)
+		color   = Client._color(severity)
+		message = message.replace('\\n', '\n')
 		Client.print(f'{color}{severity.upper()}{Client._reset()}: \x1B[3m{message}\x1B[0m')
 		if severity == 'halt':
 			exit(1)
@@ -40,30 +46,31 @@ class Client:
 	def request(method: str, path: str, **kwargs):
 		Client.print('-' * 40)
 		Client.print(f'Calling `{path}`')
-		
-		# Print request parameters if they exist
+
 		if 'json' in kwargs:
 			for key, val in kwargs['json'].items():
 				Client.print(f'  {key:<14}: `{val}`')
 		print()
-		url = f'{Client.base_url}/{path.lstrip("/")}'
-		
-		# Set 2-minute timeout if not specified
+		url = f'{DAPI_URL}/{path.lstrip("/")}'
+
 		if 'timeout' not in kwargs:
-			kwargs['timeout'] = 120.0  # 2 minutes in seconds
-			
+			kwargs['timeout'] = 1200.0
+
 		try:
 			res = httpx.request(method, url, **kwargs)
 			res.raise_for_status()
 			return res.json()
+		except httpx.ConnectError as e:
+			Client.error('halt', e)
 		except httpx.HTTPStatusError as e:
 			try:
+				print(json.dumps(e.__dict__, indent=4))
 				detail   = e.response.json()['detail']
 				message  = detail.get('message', 'Unknown error')
 				severity = detail.get('severity', 'halt')
 				Client.error(severity, message)
 			except Exception:
-				Client.print('Error:', e.response.text)
+				Client.print('Error:', e.response.text.replace('\\n', '\n').replace('\\', ''))
 
 	############################################################################
 
@@ -98,7 +105,7 @@ class Client:
 		}
 		if config is not None:
 			data['config'] = config
-		
+
 		res = Client.request('POST', '/create_operator', json=data)
 		Client.success(f'operator `{name}` created')
 		return res
@@ -114,30 +121,49 @@ class Client:
 		return Client.request('GET', '/list_operators')
 
 	@staticmethod
-	def create_transaction(operator):
-		return Client.request('POST', '/create_transaction', json={ 'operator': operator })
-
-	@staticmethod
-	def delete_transaction(tx_id: str):
-		res = Client.request('POST', '/delete_transaction', json={ 'tx_id': tx_id })
-		Client.success(f'transaction `{tx_id}` deleted')
-		return res
-
-	@staticmethod
-	def assign(tx_id, from_, to):
-		return Client.request('POST', '/create_transaction_assignment', json={
-			'tx_id': tx_id,
-			'from' : from_,
-			'to'   : to
-		})
-
-	@staticmethod
-	def invoke_transaction(tx_id):
-		return Client.request('POST', '/invoke_transaction', json={ 'tx_id': tx_id })
-
-	@staticmethod
 	def invoke(name: str, input_data: dict):
 		return Client.request('POST', '/invoke_operator', json={
-			'name' : name,
-			'input': input_data
+			'name'  : name,
+			'input' : input_data
 		})
+
+	##################################################################################
+
+	@staticmethod
+	def compile(code_path):
+		# self.reset()
+		definitions = Code.serialize(code_path)
+
+		entry_name = definitions.get('entry_name')
+		if entry_name:
+			entry_io = definitions['functions'][entry_name]
+			for type_name in [entry_io['input_type'], entry_io['output_type']]:
+				if type_name not in definitions['types']:
+					raise TypeError(f'Type `{type_name}` is not defined in `{code_path}`')
+		else:
+			raise ValueError(f'Entry point is not defined in process `{code_path}`')
+		
+		for type_name, type_data in definitions['types'].items():
+			model = type(type_name, (Datum.Pydantic,), {})
+			model.model_json_schema = lambda: type_data['schema']
+			Client.create_type(type_name, model)
+
+		for op_name, op_data in definitions['functions'].items():
+			Client.create_operator(
+				name        = op_name,
+				input_type  = op_data['input_type'],
+				output_type = op_data['output_type'],
+				code        = op_data['code'],
+				interpreter = op_data['interpreter'],
+				config      = op_data.get('config')
+			)
+
+		return definitions
+
+	@staticmethod
+	def reset():
+		print("RESET")
+		for operator in Client.list_operators():
+			Client.delete_operator(operator['name'])
+		for type_ in Client.list_types():
+			Client.delete_type(type_['name'])

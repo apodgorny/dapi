@@ -60,9 +60,9 @@ class TypesSchema(BaseModel):
 # OPERATOR schemas
 ###########################################################################
 
-class FunctionDefinitionSchema(BaseModel):  # Matches structure of meta.definition for interpreter='function'
-	transactions : List[str]      = Field(..., description='Transaction chain for function operator')
-	scope        : Dict[str, Any] = Field(default_factory=dict, description='Initial runtime scope')
+# class FunctionDefinitionSchema(BaseModel):  # Matches structure of meta.definition for interpreter='function'
+# 	transactions : List[str]      = Field(..., description='Transaction chain for function operator')
+# 	scope        : Dict[str, Any] = Field(default_factory=dict, description='Initial runtime scope')
 
 class OperatorSchema(BaseModel):
 	name        : str             = Field(...,                  description='Operator name')
@@ -101,30 +101,30 @@ class OperatorScopeSchema(RootModel[Dict[str, Any]]):
 # TRANSACTION schemas
 ###########################################################################
 
-class TransactionCreateSchema(BaseModel):
-	operator: str = Field(..., description='Operator to invoke')
+# class TransactionCreateSchema(BaseModel):
+# 	operator: str = Field(..., description='Operator to invoke')
 
-class TransactionSchema(BaseModel):
-	id          : str | None = None
-	name        : str        = Field(..., description='Unique name under which this step is stored in scope')
-	operator    : str        = Field(..., description='Operator to invoke')
-	function_id : str | None = None  # ID of owning composite operator
+# class TransactionSchema(BaseModel):
+# 	id          : str | None = None
+# 	name        : str        = Field(..., description='Unique name under which this step is stored in scope')
+# 	operator    : str        = Field(..., description='Operator to invoke')
+# 	function_id : str | None = None  # ID of owning composite operator
 
-class TransactionsSchema(BaseModel):
-	items: List[TransactionSchema]
+# class TransactionsSchema(BaseModel):
+# 	items: List[TransactionSchema]
 
 
 # ASSIGNMENT schemas
 ###########################################################################
 
-class AssignmentSchema(BaseModel):
-	id             : str = None
-	transaction_id : str = Field(..., description='Target transaction')
-	l_accessor     : str = Field(..., description='Accessor to assign to (target)')
-	r_accessor     : str = Field(..., description='Accessor to assign from (source)')
+# class AssignmentSchema(BaseModel):
+# 	id             : str = None
+# 	transaction_id : str = Field(..., description='Target transaction')
+# 	l_accessor     : str = Field(..., description='Accessor to assign to (target)')
+# 	r_accessor     : str = Field(..., description='Accessor to assign from (source)')
 
-class AssignmentsSchema(BaseModel):
-	items: List[AssignmentSchema]
+# class AssignmentsSchema(BaseModel):
+# 	items: List[AssignmentSchema]
 
 
 # INVOCATION schemas

@@ -62,7 +62,7 @@ class OperatorRecord(Record):
 	interpreter  : Mapped[str]             = mapped_column(String(50),                   nullable=False,   comment='Interpreter name (e.g. python, llm, composite)')
 	input_type   : Mapped[str]             = mapped_column(String(255),                  nullable=False,   comment='Input type name (foreign key to TypeTable)')
 	output_type  : Mapped[str]             = mapped_column(String(255),                  nullable=False,   comment='Output type name (foreign key to TypeTable)')
-	transactions : Mapped[list[str]]       = mapped_column(JSON,                         default=list,     comment='List of transaction IDs for function operators')
+	# transactions : Mapped[list[str]]       = mapped_column(JSON,                         default=list,     comment='List of transaction IDs for function operators')
 	scope        : Mapped[Dict[str, Any]]  = mapped_column(MutableDict.as_mutable(JSON), default=dict,     comment='Runtime scope for function operators')
 	config       : Mapped[Dict[str, Any]]  = mapped_column(MutableDict.as_mutable(JSON), default=dict,     comment='Configuration passed to interpreter')
 
@@ -91,26 +91,26 @@ class OperatorInstanceRecord(Record):
 	invoked_at  = Column(DateTime,                     nullable=True,                                          comment='Time of successful invocation')
 
 
-# Transactions (ephemeral until invoked)
-#####################################################################
+# # Transactions (ephemeral until invoked)
+# #####################################################################
 
-class TransactionRecord(Record):
-	__tablename__ = 'transactions'
+# class TransactionRecord(Record):
+# 	__tablename__ = 'transactions'
 
-	id          : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique transaction ID')
-	name        : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Step name used in scope')
-	operator    : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Operator to invoke')
-	input       : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Runtime input payload')
-	output      : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Runtime output after invoke')
+# 	id          : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique transaction ID')
+# 	name        : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Step name used in scope')
+# 	operator    : Mapped[str]            = mapped_column(String(255), nullable=False,   comment='Operator to invoke')
+# 	input       : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Runtime input payload')
+# 	output      : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True,           comment='Runtime output after invoke')
 
 
-# Assignments (input wiring into transactions)
-#####################################################################
+# # Assignments (input wiring into transactions)
+# #####################################################################
 
-class AssignmentRecord(Record):
-	__tablename__ = 'assignments'
+# class AssignmentRecord(Record):
+# 	__tablename__ = 'assignments'
 
-	id             : Mapped[str] = mapped_column(String(255), primary_key=True, comment='Unique assignment ID')
-	transaction_id : Mapped[str] = mapped_column(String(255), nullable=False,   comment='Transaction ID (foreign key to TransactionTable)')
-	r_accessor     : Mapped[str] = mapped_column(String(255), nullable=False,   comment='Read accessor')
-	l_accessor     : Mapped[str] = mapped_column(String(255), nullable=False,   comment='Write accessor')
+# 	id             : Mapped[str] = mapped_column(String(255), primary_key=True, comment='Unique assignment ID')
+# 	transaction_id : Mapped[str] = mapped_column(String(255), nullable=False,   comment='Transaction ID (foreign key to TransactionTable)')
+# 	r_accessor     : Mapped[str] = mapped_column(String(255), nullable=False,   comment='Read accessor')
+# 	l_accessor     : Mapped[str] = mapped_column(String(255), nullable=False,   comment='Write accessor')

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dapi.lib          import DapiService, DapiException
 from dapi.interpreters import PythonInterpreter, LLMInterpreter, PluginInterpreter
-from dapi.lib.datum    import Datum
 
 
 @DapiService.wrap_exceptions()
@@ -12,18 +11,24 @@ class InterpreterService(DapiService):
 	def __init__(self, dapi):
 		self.dapi = dapi
 		self.interpreters = {
-			'python'   : PythonInterpreter(dapi),
-			'llm'      : LLMInterpreter(),
-			'plugin'   : PluginInterpreter(),
-			'function' : None
+			'python': PythonInterpreter(dapi),
+			'llm': LLMInterpreter(),
+			'plugin': PluginInterpreter(),
+			'function': None
 		}
 
 	############################################################################
 
 	async def has(self, name: str) -> bool:
+		"""Check if the interpreter exists."""
 		return name in self.interpreters
 
 	async def require(self, name: str):
+		"""Ensure the interpreter exists and return it."""
 		if not await self.has(name):
-			raise DapiException(status_code=404, detail=f'Interpreter `{name}` does not exist', severity=DapiException.HALT)
+			raise DapiException(
+				status_code=404,
+				detail=f'Interpreter `{name}` does not exist',
+				severity=DapiException.HALT
+			)
 		return self.interpreters[name]
