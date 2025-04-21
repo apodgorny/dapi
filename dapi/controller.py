@@ -1,5 +1,5 @@
 from dapi.lib.dapi     import Dapi
-from dapi.services     import TypeService, OperatorService, InterpreterService, InstanceService
+from dapi.services     import OperatorService, InterpreterService, InstanceService
 from dapi.schemas      import (
 	NameSchema,
 	EmptySchema,
@@ -14,7 +14,7 @@ from dapi.schemas      import (
 
 
 dapi = Dapi(
-	TypeService,
+	# TypeService,
 	OperatorService,
 	InterpreterService,
 	InstanceService
@@ -24,25 +24,25 @@ dapi = Dapi(
 # TYPE endpoints
 ############################################################################
 
-@dapi.router.post('/create_type', response_model=TypeSchema)
-async def create_type(input: TypeSchema):
-	await dapi.type_service.create(name=input.name, schema=input.schema)
-	return input
+# @dapi.router.post('/create_type', response_model=TypeSchema)
+# async def create_type(input: TypeSchema):
+# 	await dapi.type_service.create(name=input.name, schema=input.schema)
+# 	return input
 
-@dapi.router.post('/get_type', response_model=TypeSchema)
-async def get_type(input: NameSchema):
-	record = await dapi.type_service.get(input.name)
-	return TypeSchema(name=record['name'], schema=record['schema'])
+# @dapi.router.post('/get_type', response_model=TypeSchema)
+# async def get_type(input: NameSchema):
+# 	record = await dapi.type_service.get(input.name)
+# 	return TypeSchema(name=record['name'], schema=record['schema'])
 
-@dapi.router.post('/get_all_types', response_model=TypesSchema)
-async def get_all_types(input: EmptySchema):
-	records = await dapi.type_service.get_all()
-	return TypesSchema(items=[TypeSchema(name=r['name'], schema=r['schema']) for r in records])
+# @dapi.router.post('/get_all_types', response_model=TypesSchema)
+# async def get_all_types(input: EmptySchema):
+# 	records = await dapi.type_service.get_all()
+# 	return TypesSchema(items=[TypeSchema(name=r['name'], schema=r['schema']) for r in records])
 
-@dapi.router.post('/delete_type', response_model=StatusSchema)
-async def delete_type(input: NameSchema):
-	await dapi.type_service.delete(input.name)
-	return {'status': 'success'}
+# @dapi.router.post('/delete_type', response_model=StatusSchema)
+# async def delete_type(input: NameSchema):
+# 	await dapi.type_service.delete(input.name)
+# 	return {'status': 'success'}
 
 
 # OPERATOR endpoints

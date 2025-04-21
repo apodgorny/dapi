@@ -18,9 +18,9 @@ def main():
 	module_name        = file_path.stem
 	definitions        = Client.compile(file_path)
 	entry_name         = definitions['entry_name']
-	entry_input_type   = definitions['entry_input_type']
 	module             = Module.import_module(module_name, str(file_path))
-	input_type         = getattr(module, entry_input_type)
+	entry              = getattr(module, entry_name)
+	input_type         = getattr(entry, 'InputType')
 	cli_parser         = argparse.ArgumentParser()
 	defaults           = {}
 
@@ -48,6 +48,7 @@ def main():
 	print('input_dict', input_dict)
 
 	Datum(input_type).validate(input_dict)
+	# Client.reset()
 	result = Client.invoke(entry_name, input_dict)
 	print(result)
 

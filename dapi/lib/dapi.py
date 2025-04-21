@@ -49,6 +49,13 @@ class Dapi:
 	def start(self, app):
 		self.app = app
 		self.app.include_router(self.router)
+		
+	async def initialize_services(self):
+		"""Initialize all services asynchronously."""
+		for service_name in dir(self):
+			service = getattr(self, service_name)
+			if isinstance(service, DapiService) and hasattr(service, 'initialize'):
+				await service.initialize()
 
 ########################################################################		
 
@@ -57,6 +64,9 @@ class DapiService:
 
 	def __init__(self, dapi):
 		self.dapi = dapi
+
+	async def initialize(self):
+		print('Initializing service', self.__class__.__name__)
 
 	@classmethod
 	def wrap_exceptions(cls, handler_map=None):

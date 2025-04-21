@@ -43,11 +43,34 @@ class Record(Base):
 # JSON schema types
 #####################################################################
 
-class TypeRecord(Record):
-	__tablename__ = 'types'
+# class TypeRecord(Record):
+# 	__tablename__ = 'types'
 
-	name   : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique type name')
-	schema : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False,          comment='Full JSON Schema')
+# 	name   : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique type name')
+# 	schema : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False,          comment='Full JSON Schema')
+
+
+# # Operators (atomic static/dynamic/composite)
+# #####################################################################
+
+# class OperatorRecord(Record):
+# 	__tablename__ = 'operators'
+
+# 	name         : Mapped[str]             = mapped_column(String(255),                  primary_key=True, comment='Unique operator name')
+# 	description  : Mapped[str]             = mapped_column(Text,                         nullable=True,    comment='Optional operator description')
+# 	code         : Mapped[str]             = mapped_column(Text,                         nullable=True,    comment='Source code or prompt (or empty for composite)')
+# 	interpreter  : Mapped[str]             = mapped_column(String(50),                   nullable=False,   comment='Interpreter name (e.g. python, llm, composite)')
+# 	input_type   : Mapped[str]             = mapped_column(String(255),                  nullable=False,   comment='Input type name (foreign key to TypeTable)')
+# 	output_type  : Mapped[str]             = mapped_column(String(255),                  nullable=False,   comment='Output type name (foreign key to TypeTable)')
+# 	# transactions : Mapped[list[str]]       = mapped_column(JSON,                         default=list,     comment='List of transaction IDs for function operators')
+# 	scope        : Mapped[Dict[str, Any]]  = mapped_column(MutableDict.as_mutable(JSON), default=dict,     comment='Runtime scope for function operators')
+# 	config       : Mapped[Dict[str, Any]]  = mapped_column(MutableDict.as_mutable(JSON), default=dict,     comment='Configuration passed to interpreter')
+
+# class TypeRecord(Record):
+# 	__tablename__ = 'types'
+
+# 	name   : Mapped[str]            = mapped_column(String(255), primary_key=True, comment='Unique type name')
+# 	schema : Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False,          comment='Full JSON Schema')
 
 
 # Operators (atomic static/dynamic/composite)
@@ -60,9 +83,10 @@ class OperatorRecord(Record):
 	description  : Mapped[str]             = mapped_column(Text,                         nullable=True,    comment='Optional operator description')
 	code         : Mapped[str]             = mapped_column(Text,                         nullable=True,    comment='Source code or prompt (or empty for composite)')
 	interpreter  : Mapped[str]             = mapped_column(String(50),                   nullable=False,   comment='Interpreter name (e.g. python, llm, composite)')
-	input_type   : Mapped[str]             = mapped_column(String(255),                  nullable=False,   comment='Input type name (foreign key to TypeTable)')
-	output_type  : Mapped[str]             = mapped_column(String(255),                  nullable=False,   comment='Output type name (foreign key to TypeTable)')
-	# transactions : Mapped[list[str]]       = mapped_column(JSON,                         default=list,     comment='List of transaction IDs for function operators')
+	
+	input_type   : Mapped[Dict[str, Any]]  = mapped_column(JSON,                         nullable=False,   comment='Full JSON Schema')
+	output_type  : Mapped[Dict[str, Any]]  = mapped_column(JSON,                         nullable=False,   comment='Full JSON Schema')
+
 	scope        : Mapped[Dict[str, Any]]  = mapped_column(MutableDict.as_mutable(JSON), default=dict,     comment='Runtime scope for function operators')
 	config       : Mapped[Dict[str, Any]]  = mapped_column(MutableDict.as_mutable(JSON), default=dict,     comment='Configuration passed to interpreter')
 

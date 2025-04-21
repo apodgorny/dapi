@@ -131,32 +131,9 @@ class Client:
 
 	@staticmethod
 	def compile(code_path):
-		# self.reset()
 		definitions = Code.serialize(code_path)
-
-		entry_name = definitions.get('entry_name')
-		if entry_name:
-			entry_io = definitions['functions'][entry_name]
-			for type_name in [entry_io['input_type'], entry_io['output_type']]:
-				if type_name not in definitions['types']:
-					raise TypeError(f'Type `{type_name}` is not defined in `{code_path}`')
-		else:
-			raise ValueError(f'Entry point is not defined in process `{code_path}`')
-		
-		for type_name, type_data in definitions['types'].items():
-			model = type(type_name, (Datum.Pydantic,), {})
-			model.model_json_schema = lambda: type_data['schema']
-			Client.create_type(type_name, model)
-
-		for op_name, op_data in definitions['functions'].items():
-			Client.create_operator(
-				name        = op_name,
-				input_type  = op_data['input_type'],
-				output_type = op_data['output_type'],
-				code        = op_data['code'],
-				interpreter = op_data['interpreter'],
-				config      = op_data.get('config')
-			)
+		for op_name, op_data in definitions['operators'].items():
+			Client.create_operator(**op_data)
 
 		return definitions
 

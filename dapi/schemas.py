@@ -66,8 +66,8 @@ class TypesSchema(BaseModel):
 
 class OperatorSchema(BaseModel):
 	name        : str             = Field(...,                  description='Operator name')
-	input_type  : str             = Field(...,                  description='Input type name')
-	output_type : str             = Field(...,                  description='Output type name')
+	input_type  : Dict[str, Any]  = Field(...,                  description='Input type name')
+	output_type : Dict[str, Any]  = Field(...,                  description='Output type name')
 	code        : str | None      = Field(None,                 description='Executable code (ignored for functions)')
 	description : str             = Field('',                   description='Human‑readable description')
 	interpreter : InterpreterEnum = Field(...,                  description='Execution backend')

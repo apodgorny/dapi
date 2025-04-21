@@ -5,6 +5,7 @@ import uuid
 
 from dapi.db         import OperatorRecord
 from dapi.lib        import Datum, DapiService, DapiException, DatumSchemaError
+from dapi.lib.operator import Operator
 from dapi.schemas    import OperatorSchema
 from dapi.lib.module import Module
 
@@ -14,34 +15,34 @@ OPERATOR_DIR = os.path.join(
 	os.environ.get('OPERATOR_DIR', 'operators')
 )
 
-
 @DapiService.wrap_exceptions({DatumSchemaError: (400, 'halt')})
 class OperatorService(DapiService):
 	'''Service for managing operators.'''
 
 	def __init__(self, dapi):
+		print('Initializing service')
 		self.dapi = dapi
+
+	async def initialize(self):
+		await super().initialize()
+		await self.register_plugin_operators()
 
 	############################################################################
 
 	async def register_plugin_operators(self):
+		print(OPERATOR_DIR)
 		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
 
 		for name, cls in classes.items():
-			input_type  = getattr(cls, 'input_type', None)
-			output_type = getattr(cls, 'output_type', None)
-
-			if not input_type or not output_type:
-				continue
-
+			print('Loading operator:', name)
 			schema = OperatorSchema(
 				name         = name,
 				interpreter  = 'plugin',
-				input_type   = input_type,
-				output_type  = output_type,
+				input_type   = cls.InputType.model_json_schema(),
+				output_type  = cls.OutputType.model_json_schema(),
 				code         = '',
 				meta         = None,
-				description  = (cls.__doc__ or '').strip() or None
+				description  = (cls.__doc__ or '').strip() or ''
 			)
 
 			try:
@@ -53,13 +54,11 @@ class OperatorService(DapiService):
 
 	async def get_input_datum(self, name: str) -> Datum:
 		operator = self.dapi.db.get(OperatorRecord, name)
-		type_record = await self.dapi.type_service.get(operator.input_type)
-		return Datum(type_record['schema'])
+		return Datum(operator.input_type)
 
 	async def get_output_datum(self, name: str) -> Datum:
 		operator = self.dapi.db.get(OperatorRecord, name)
-		type_record = await self.dapi.type_service.get(operator.output_type)
-		return Datum(type_record['schema'])
+		return Datum(operator.output_type)
 
 	############################################################################
 
@@ -103,7 +102,7 @@ class OperatorService(DapiService):
 
 	async def create(self, schema: OperatorSchema) -> str:
 		self.validate_name(schema.name)
-		await self.validate_io(schema)
+		# await self.validate_io(schema)
 		await self.validate_interpreter(schema.interpreter)
 
 		record = OperatorRecord(**schema.model_dump())
@@ -118,6 +117,11 @@ class OperatorService(DapiService):
 
 	async def get_all(self) -> list[dict]:
 		return [op.to_dict() for op in self.dapi.db.query(OperatorRecord).all()]
+		
+	async def get_operator_sources(self) -> list[str]:
+		"""Get a list of all operator names/sources."""
+		operators = await self.get_all()
+		return [op['name'] for op in operators]
 
 	async def delete(self, name: str) -> None:
 		record = self.require(name)

@@ -39,4 +39,4 @@ class PythonInterpreter(Interpreter):
 			raise ValueError(f'Runtime error in `{operator_name}`:\n{traceback.format_exc()}') from e
 
 		output.from_dict(output_dict)
-		return output if not output.is_empty() else input
+		return output

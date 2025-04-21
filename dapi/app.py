@@ -6,23 +6,18 @@ from dapi.controller import dapi
 from dapi.middleware import enhance_openapi_schema
 
 os.environ['PROJECT_PATH'] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-app = FastAPI()
 
+app = FastAPI()
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=['*'],  # or ['http://127.0.0.1:8000']
-	allow_credentials=True,
-	allow_methods=['*'],
-	allow_headers=['*'],
+	allow_origins     = ['*'], # or ['http://127.0.0.1:8000']
+	allow_methods     = ['*'],
+	allow_headers     = ['*'],
+	allow_credentials = True,
 )
 app.middleware('http')(enhance_openapi_schema)
-
 dapi.start(app)
 
-@app.get('/')
-async def root():
-	import json
-	return {
-		'message': 'DAPI is awesome.',
-		'operators': await dapi.operator_service.get_operator_sources()
-	}
+@app.on_event('startup')
+async def startup_event():
+	await dapi.initialize_services()
