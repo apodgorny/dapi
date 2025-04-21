@@ -1,10 +1,10 @@
-from dapi.lib import Datum, OperatorDefinition
+from dapi.lib import Datum, Operator
 
 
 ################################################################
 
-# Define the square operator class that extends OperatorDefinition
-class square(OperatorDefinition):
+# Define the square operator class that extends Operator
+class square(Operator):
 	class InputType(Datum.Pydantic):
 		x: float
 
@@ -17,7 +17,7 @@ class square(OperatorDefinition):
 
 ################################################################
 
-class ollama_add_one(OperatorDefinition):
+class ollama_add_one(Operator):
 	class InputType(Datum.Pydantic):
 		x: float
 
@@ -37,8 +37,8 @@ class ollama_add_one(OperatorDefinition):
 
 ################################################################
 
-# Define the double_then_square operator class that extends OperatorDefinition
-class double_then_square(OperatorDefinition):
+# Define the double_then_square operator class that extends Operator
+class double_then_square(Operator):
 	class InputType(Datum.Pydantic):
 		x: float
 

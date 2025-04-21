@@ -6,7 +6,7 @@ from dapi.lib        import String
 from dapi.lib.module import Module
 
 
-class OperatorDefinition:
+class Operator:
 	interpreter = 'python'
 	def invoke(input):
 		pass
@@ -15,7 +15,7 @@ class OperatorDefinition:
 class Code:
 	@staticmethod
 	def _is_operator_class(node):
-		return any((getattr(base, 'id', '') == 'OperatorDefinition') for base in node.bases)
+		return any((getattr(base, 'id', '') == 'Operator') for base in node.bases)
 
 	@staticmethod
 	def _is_class(node):
@@ -33,7 +33,9 @@ class Code:
 
 	@staticmethod
 	def _get_interpreter(operator):
-		if operator.interpreter == 'llm' or not operator.invoke:
+		if hasattr(operator, 'interpreter'):
+			return operator.interpreter
+		if not hasattr(operator, 'invoke'):
 			return 'llm'
 		return 'python'
 

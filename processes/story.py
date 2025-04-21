@@ -1,5 +1,5 @@
 import json
-from dapi.lib import Datum, OperatorDefinition
+from dapi.lib import Datum, Operator
 from typing import List, Dict, Any, Optional
 
 
@@ -13,7 +13,7 @@ class main_input(Datum.Pydantic):
 class main_output(Datum.Pydantic):
 	text: str
 
-class main(OperatorDefinition):
+class main(Operator):
 	def invoke(input):
 		idea_result = idea({
 			'topic' : input['topic']
@@ -45,7 +45,7 @@ class recurse_plan_input(Datum.Pydantic):
 class recurse_plan_output(Datum.Pydantic):
 	items : List[Dict[str, Any]]  # Using Dict instead of custom type to avoid schema issues
 
-class recurse_plan(OperatorDefinition):
+class recurse_plan(Operator):
 	def invoke(input):
 		level       = input['level']
 		depth       = input['depth']
@@ -111,7 +111,7 @@ class recurse_input(Datum.Pydantic):
 class recurse_output(Datum.Pydantic):
 	items : List[str]
 
-class recurse(OperatorDefinition):
+class recurse(Operator):
 	def invoke(input):
 		level   = input['level']
 		depth   = input['depth']
@@ -146,7 +146,7 @@ class diverge_story_input(Datum.Pydantic):
 class diverge_story_output(Datum.Pydantic):
 	items : List[str]
 
-class diverge_story(OperatorDefinition):
+class diverge_story(Operator):
 	code = '''
 		Ты — писатель, пишущий художественную прозу на русском языке.
 		Вот отрывок:
@@ -179,7 +179,7 @@ class idea_input(Datum.Pydantic):
 class idea_output(Datum.Pydantic):
 	idea : str
 
-class idea(OperatorDefinition):
+class idea(Operator):
 	code = '''
 		Ты — шаман внимания, знающий как приворожить чувства словами, умеющий приклеить внимание слушателя виртуозно к своим словам.
 		Ты получаешь чувство собственной значимости от того экстаза, который слушатель испытывает от путешествия с тобой в твоё повествование.
@@ -207,7 +207,7 @@ class planner_input(Datum.Pydantic):
 class planner_output(Datum.Pydantic):
 	titles : List[str]
 
-class planner(OperatorDefinition):
+class planner(Operator):
 	code = '''
 		Ты — мастер планирования рассказов и книг.
 		Tвоё мастерство - правильно озаглавить части книги, так, чтобы просто читая заголовки было понятно о чем будет глава.

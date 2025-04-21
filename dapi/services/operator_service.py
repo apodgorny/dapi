@@ -30,26 +30,28 @@ class OperatorService(DapiService):
 	############################################################################
 
 	async def register_plugin_operators(self):
-		print(OPERATOR_DIR)
 		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
 
 		for name, cls in classes.items():
-			print('Loading operator:', name)
-			schema = OperatorSchema(
-				name         = name,
-				interpreter  = 'plugin',
-				input_type   = cls.InputType.model_json_schema(),
-				output_type  = cls.OutputType.model_json_schema(),
-				code         = '',
-				meta         = None,
-				description  = (cls.__doc__ or '').strip() or ''
-			)
-
+			print('Loading operator:', name, '... ')
 			try:
+				schema = OperatorSchema(
+					name         = name,
+					interpreter  = 'plugin',
+					input_type   = cls.InputType.model_json_schema(),
+					output_type  = cls.OutputType.model_json_schema(),
+					code         = '',
+					meta         = None,
+					description  = (cls.__doc__ or '').strip() or ''
+				)
 				await self.create(schema)
+				print('Success loading:', name)
 			except DapiException as e:
 				if e.detail.get('severity') == 'beware':
 					continue
+				raise
+			except:
+				print('Failed loading:', name)
 				raise
 
 	async def get_input_datum(self, name: str) -> Datum:
