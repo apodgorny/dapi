@@ -22,6 +22,22 @@ class Code:
 		return isinstance(node, ast.ClassDef)
 
 	@staticmethod
+	def _get_code(operator):
+		interpreter = Code._get_interpreter(operator)
+		code = ''
+		if interpreter == 'llm':
+			code = operator.code
+		else:
+			code = inspect.getsource(operator.invoke).replace('invoke', operator.__name__, 1)
+		return String.unindent(code)
+
+	@staticmethod
+	def _get_interpreter(operator):
+		if operator.interpreter == 'llm' or not operator.invoke:
+			return 'llm'
+		return 'python'
+
+	@staticmethod
 	def serialize(path: str) -> dict:
 		text        = Path(path).read_text()
 		tree        = ast.parse(text)
@@ -34,13 +50,12 @@ class Code:
 		for node in tree.body:
 			if Code._is_class(node) and Code._is_operator_class(node):
 				operator = getattr(module, node.name, None)
-				code     = inspect.getsource(operator.invoke).replace('invoke', operator.__name__, 1)
 				operators[node.name] = {
 					'name'        : node.name,
 					'input_type'  : operator.InputType.model_json_schema(),
 					'output_type' : operator.OutputType.model_json_schema(),
-					'code'        : String.unindent(code),
-					'interpreter' : 'python',
+					'code'        : Code._get_code(operator),
+					'interpreter' : Code._get_interpreter(operator),
 					'config'      : {}
 				}
 

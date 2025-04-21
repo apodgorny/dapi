@@ -236,6 +236,9 @@ class MiniPython:
 						case ast.Div():  return left / right
 						case ast.Mod():  return left % right
 						case _: raise Exception('Unsupported binary operator')
+				
+				case ast.Pass():
+					return None
 
 				case _: raise Exception(f'Unsupported node: {type(node).__name__}')
 		except MiniPythonRuntimeError:

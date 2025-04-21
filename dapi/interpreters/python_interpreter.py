@@ -24,7 +24,9 @@ class PythonInterpreter(Interpreter):
 		config        : dict = {}
 	) -> Datum:
 		operators = await self.dapi.operator_service.get_all()
+		input_dict = input.to_dict()
 
+		print(operator_name, 'input:', input_dict)
 		# Execute operator code through MiniPython
 		try:
 			output_dict = await MiniPython(
@@ -32,11 +34,12 @@ class PythonInterpreter(Interpreter):
 				self.invoke_external_operator
 			).call_main(
 				operator_name,
-				input.to_dict()
+				input_dict
 			)
 		except Exception as e:
 			import traceback
 			raise ValueError(f'Runtime error in `{operator_name}`:\n{traceback.format_exc()}') from e
+		print(operator_name, 'output:', output_dict)
 
 		output.from_dict(output_dict)
 		return output

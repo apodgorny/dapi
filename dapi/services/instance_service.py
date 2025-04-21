@@ -25,9 +25,6 @@ class InstanceService(DapiService):
 		datum_input  = await self.dapi.operator_service.get_input_datum(operator.name)
 		datum_output = await self.dapi.operator_service.get_output_datum(operator.name)
 
-		print('*' * 40)
-		print(instance, interpreter)
-		print('*' * 40)
 		result = await interpreter.invoke(
 			operator_name = operator.name,
 			code          = operator.code,
