@@ -17,7 +17,7 @@ class main(Operator):
 			}
 		}
 		result = await call(call_params)
-		return { 'call_result': result if result else {'result': 'Called operator'} }
+		return { 'call_result': result }
 
 class Process:
 	entry = main

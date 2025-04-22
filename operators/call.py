@@ -21,14 +21,9 @@ class Call(Operator):
 		data = input.get('data', {})
 		
 		if config and 'invoke' in config:
-			# The text field needs to be at the top level for the log operator
 			result = await config['invoke'](name, {'text': data.get('text', '')})
 			
 			if isinstance(result, dict) and 'output' in result:
-				# Extract the output field if it exists
 				return {'data': result['output']}
 			
-			return {'data': result}
-		else:
-			# Fallback if invoke function is not available
-			return {'data': {'result': 'invoke function not available'}}
+		return {'data': result}

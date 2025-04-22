@@ -12,7 +12,7 @@ class increment(Operator):
 		x: float
 
 	async def invoke(self, input):
-		x = input.x
+		x = input['x']
 		return { 'x' : x + 1 }
 
 ################################################################
@@ -26,7 +26,7 @@ class main(Operator):
 
 	async def invoke(self, input):
 		# Placeholder implementation
-		return { 'x': input.x }
+		return { 'x': input['x'] }
 
 ################################################################
 
