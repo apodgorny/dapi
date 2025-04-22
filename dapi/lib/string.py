@@ -38,3 +38,7 @@ class String:
 		'''Replaces multiple spaces/newlines with a single space.'''
 		import re
 		return re.sub(r'\s+', ' ', text).strip()
+
+	@staticmethod
+	def underlined(text: str) -> str:
+		return f'\033[4m{text}\033[0m'

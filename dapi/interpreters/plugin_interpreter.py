@@ -1,4 +1,5 @@
 import os
+import inspect
 from pathlib           import Path
 from dapi.lib          import Datum, Interpreter
 from dapi.lib.module   import Module
@@ -24,19 +25,36 @@ class PluginInterpreter(Interpreter):
 		output        : Datum,
 		config        : dict = {}
 	) -> Datum:
-		file_path = os.path.join(self.OPERATOR_DIR, f'{operator_name}.py')
-		klass     = Module.find_class_by_base(Operator, file_path)
+		file_path      = os.path.join(self.OPERATOR_DIR, f'{operator_name}.py')
+		operator_class = Module.find_class_by_base(Operator, file_path)
 
-		if not klass:
-			raise ValueError(f'Plugin `{operator_name}` does not define a subclass of `Operator`')
+		if not operator_class:
+			raise ValueError(f'Plugin operator `{operator_name}` must be a subclass of `Operator`')
 
-		if not hasattr(klass, 'invoke') or not callable(getattr(klass, 'invoke')):
-			raise ValueError(f'Plugin `{operator_name}` must define static method `invoke(input)`')
+		if not hasattr(operator_class, 'invoke') or not callable(getattr(operator_class, 'invoke')):
+			raise ValueError(f'Plugin operator `{operator_name}` must define static method `invoke(input)`')
+
+		# Check if the invoke method is async
+		if not inspect.iscoroutinefunction(operator_class.invoke):
+			raise ValueError(f'Plugin operator `{operator_name}` must define an async invoke method')
+
+		# Define a wrapper for operator_service.invoke that returns the actual output
+		async def invoke_wrapper(name, data):
+			result = await self.dapi.operator_service.invoke(name, data)
+			# Extract the actual output from the result
+			if isinstance(result, dict) and 'output' in result:
+				return result['output']
+			return result
+			
+		config_with_invoke = {**config, 'invoke': invoke_wrapper}
 
 		try:
 			# Pass input data and config to the plugin
-			result   = klass.invoke(input.to_dict(), config)
-			expected = output.schema.model_validate(result)
+			input_dict = input.to_dict()
+			result     = await operator_class.invoke(input_dict, config_with_invoke)
+			expected   = output.schema.model_validate(result)
+
 			return output.from_dict(expected.model_dump())
 		except Exception as e:
-			raise ValueError(f'Execution error in `{operator_name}`: {e}')
+			import traceback
+			raise ValueError(f'Execution error in `{operator_name}`: {e}\n{traceback.format_exc()}')

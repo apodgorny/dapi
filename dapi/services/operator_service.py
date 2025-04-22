@@ -4,10 +4,8 @@ import os
 import uuid
 
 from dapi.db         import OperatorRecord
-from dapi.lib        import Datum, DapiService, DapiException, DatumSchemaError
-from dapi.lib.operator import Operator
+from dapi.lib        import String, Datum, DapiService, DapiException, DatumSchemaError, Operator, Module, is_reserved
 from dapi.schemas    import OperatorSchema
-from dapi.lib.module import Module
 
 
 OPERATOR_DIR = os.path.join(
@@ -32,20 +30,21 @@ class OperatorService(DapiService):
 	async def register_plugin_operators(self):
 		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
 
+		print(String.underlined('\nLoading operators:'))
 		for name, cls in classes.items():
-			print('Loading operator:', name, '... ')
+			if is_reserved(name):
+				raise ValueError(f'Can not load operator `{name}` - the name is reserved')
 			try:
+				print('  -', name)
 				schema = OperatorSchema(
 					name         = name,
 					interpreter  = 'plugin',
 					input_type   = cls.InputType.model_json_schema(),
 					output_type  = cls.OutputType.model_json_schema(),
 					code         = '',
-					meta         = None,
 					description  = (cls.__doc__ or '').strip() or ''
 				)
 				await self.create(schema)
-				print('Success loading:', name)
 			except DapiException as e:
 				if e.detail.get('severity') == 'beware':
 					continue
@@ -131,12 +130,13 @@ class OperatorService(DapiService):
 		self.dapi.db.commit()
 
 	async def invoke(self, name: str, input: dict) -> dict:
-		# print('[OPERATOR_SERVICE] Invoking', name)
+		# print('[OPERATOR_SERVICE] Invoking', name, 'with input', type(input), input)
 		operator  = self.require(name)
+		# async def create(self, operator_name: str, instance_name: str = None, input_data: dict = {}) -> OperatorInstanceSchema:
 		instance  = await self.dapi.instance_service.create(
 			operator_name = name,
 			input_data    = input
 		)
 		result = await self.dapi.instance_service.invoke(instance.id)
-		# print(f'[OPERATOR_SERVICE] Invoked {name}')
+		# print(f'[OPERATOR_SERVICE] Invoked {name} with result {result}')
 		return result.output

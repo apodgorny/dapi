@@ -11,8 +11,8 @@ class square(Operator):
 	class OutputType(Datum.Pydantic):
 		x: float
 
-	def invoke(self, input):
-		x = input.x
+	async def invoke(self, input):
+		x = input['x']
 		return { 'x' : x * x }
 
 ################################################################
@@ -45,11 +45,11 @@ class double_then_square(Operator):
 	class OutputType(Datum.Pydantic):
 		x: float
 
-	def invoke(self, input):
-		doubled     = times_two({'x' : input.x})           # Plugin
-		squared     = square({'x': doubled['x']})          # Python
-		incremented = ollama_add_one({'x': squared['x']})  # LLM
-		return { 'x' : incremented.x }
+	async def invoke(self, input):
+		doubled     = await times_two({'x' : input['x']})           # Plugin
+		squared     = await square({'x': doubled['x']})          # Python
+		incremented = await ollama_add_one({'x': squared['x']})  # LLM
+		return { 'x' : incremented['x'] }
 
 
 ################################################################

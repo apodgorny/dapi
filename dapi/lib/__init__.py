@@ -10,3 +10,5 @@ from .struct      import Struct
 from .model       import Model
 
 from .client      import Client
+
+from .reserved    import is_reserved

@@ -14,12 +14,12 @@ class main_output(Datum.Pydantic):
 	text: str
 
 class main(Operator):
-	def invoke(input):
-		idea_result = idea({
+	async def invoke(input):
+		idea_result = await idea({
 			'topic' : input['topic']
 		})
 		print('IDEA:', idea_result['idea'])
-		tree = recurse_plan({
+		tree = await recurse_plan({
 			'topic'       : input['topic'],
 			'idea'        : idea_result['idea'],
 			'breadcrumbs' : [],
@@ -46,7 +46,7 @@ class recurse_plan_output(Datum.Pydantic):
 	items : List[Dict[str, Any]]  # Using Dict instead of custom type to avoid schema issues
 
 class recurse_plan(Operator):
-	def invoke(input):
+	async def invoke(input):
 		level       = input['level']
 		depth       = input['depth']
 		topic       = input['topic']
@@ -69,7 +69,7 @@ class recurse_plan(Operator):
 		children = []
 
 		if level < depth:
-			planner_result = planner({
+			planner_result = await planner({
 				'topic'       : topic,
 				'idea'        : idea,
 				'breadcrumbs' : bc_string
@@ -78,7 +78,7 @@ class recurse_plan(Operator):
 			print(indent, '  planner returned', planner_result)
 
 			for subtitle in planner_result['titles']:
-				child_result = recurse_plan({
+				child_result = await recurse_plan({
 					'level'       : level + 1,
 					'depth'       : depth,
 					'topic'       : topic,
@@ -112,7 +112,7 @@ class recurse_output(Datum.Pydantic):
 	items : List[str]
 
 class recurse(Operator):
-	def invoke(input):
+	async def invoke(input):
 		level   = input['level']
 		depth   = input['depth']
 		text    = input['text']
@@ -121,12 +121,12 @@ class recurse(Operator):
 
 		print(indent, 'BEGIN Level', level)
 		if level < depth:
-			diverged = diverge_story({
+			diverged = await diverge_story({
 				'text': text
 			})
 			print(indent, 'Diverged', len(diverged['items']), 'items')
 			for item in diverged['items']:
-				recursed = recurse({
+				recursed = await recurse({
 					'level' : level + 1,
 					'depth' : depth,
 					'text'  : item

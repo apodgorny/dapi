@@ -11,7 +11,7 @@ class increment(Operator):
 	class OutputType(Datum.Pydantic):
 		x: float
 
-	def invoke(self, input):
+	async def invoke(self, input):
 		x = input.x
 		return { 'x' : x + 1 }
 
@@ -24,8 +24,9 @@ class main(Operator):
 	class OutputType(Datum.Pydantic):
 		x: float
 
-	def invoke(self, input):
-		#...
+	async def invoke(self, input):
+		# Placeholder implementation
+		return { 'x': input.x }
 
 ################################################################
 

@@ -44,7 +44,7 @@ class Dapi:
 
 		Base.metadata.create_all(bind=engine)
 
-		print('DAPI Controller is initiated')
+		print('\nDAPI Controller is initiated\n')
 
 	def start(self, app):
 		self.app = app
@@ -52,6 +52,7 @@ class Dapi:
 		
 	async def initialize_services(self):
 		"""Initialize all services asynchronously."""
+		print(String.underlined('\nInitializing services:'))
 		for service_name in dir(self):
 			service = getattr(self, service_name)
 			if isinstance(service, DapiService) and hasattr(service, 'initialize'):
@@ -66,7 +67,7 @@ class DapiService:
 		self.dapi = dapi
 
 	async def initialize(self):
-		print('Initializing service', self.__class__.__name__)
+		print('  -', self.__class__.__name__)
 
 	@classmethod
 	def wrap_exceptions(cls, handler_map=None):
@@ -80,7 +81,7 @@ class DapiService:
 			elif isinstance(e, DapiException):
 				raise e
 			else:
-				raise DapiException(status_code=500, detail=f'Unhandled error: {traceback.format_exc()}', severity='halt')
+				raise DapiException(status_code=500, detail=f'Unhandled error: {str(e)}', severity='halt')
 		
 		def create_wrapper(method):
 			if asyncio.iscoroutinefunction(method):

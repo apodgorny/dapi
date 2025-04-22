@@ -7,6 +7,9 @@ from dapi.lib import Datum
 class Interpreter(ABC):
 	'''Base class for all interpreters: python, llm, node, or custom.'''
 
+	def __init__(self, dapi):
+		self.dapi = dapi
+
 	@abstractmethod
 	async def invoke(
 		self,

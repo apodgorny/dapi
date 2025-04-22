@@ -18,7 +18,7 @@ class BranchRecursion(Operator):
 		items : list[Any]                              # Recursively nested outputs
 
 	@classmethod
-	def invoke(cls, input_data: dict, config: dict = None) -> dict:
+	async def invoke(cls, input_data: dict, config: dict = None) -> dict:
 		depth         = input_data['depth']
 		level         = input_data['level']
 		operator      = input_data['operator']
@@ -26,7 +26,7 @@ class BranchRecursion(Operator):
 		current_input = input_data.get('input_data')
 
 		# Call the operator with current input
-		result = operator(current_input)
+		result = await operator(current_input)
 
 		# Extract field with list
 		if not isinstance(result, dict):
@@ -39,11 +39,11 @@ class BranchRecursion(Operator):
 		items = []
 		if level < depth:
 			for item in result[list_field]:
-				next_input = operator(get_input, {
+				next_input = await operator(get_input, {
 					'level' : level + 1,
 					'item'  : item
 				})
-				child = cls.invoke({
+				child = await cls.invoke({
 					'depth'      : depth,
 					'level'      : level + 1,
 					'operator'   : operator,

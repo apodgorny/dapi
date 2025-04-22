@@ -63,8 +63,6 @@ class Code:
 
 		entry_name  = getattr(module.Process.entry, '__name__')
 
-		print('operators', operators)
-
 		return {
 			'operators'  : operators,
 			'entry_name' : entry_name

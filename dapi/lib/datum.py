@@ -58,35 +58,67 @@ class Datum:
 		except jsonschema.exceptions.SchemaError as exc:
 			raise DatumSchemaError(f'Invalid JSON Schema: {exc.message}')
 
+	# @classmethod
+	# def jsonschema_to_basemodel(cls, schema: dict) -> type[BaseModel]:
+	# 	title = schema.get('title')
+	# 	props = schema.get('properties')
+
+	# 	if not isinstance(title, str)  : raise DatumSchemaError('Schema must have a valid "title"')
+	# 	if not isinstance(props, dict) : raise DatumSchemaError('Schema must have a "properties" object')
+
+	# 	map = {
+	# 		'boolean' : bool,
+	# 		'integer' : int,
+	# 		'number'  : float,
+	# 		'string'  : str,
+	# 	}
+
+	# 	def type(s, path):
+	# 		t = s.get('type')
+	# 		if t in map      : return map[t]
+	# 		if t == 'array'  : return List[type(s.get('items', {}), path + ['Item'])]
+	# 		if t == 'object' : return cls.jsonschema_to_basemodel({
+	# 			'title'      : '_'.join(path),
+	# 			'properties' : s.get('properties', {})
+	# 		})
+	# 		raise DatumSchemaError(f'Unsupported or missing type for property: {".".join(path)}')
+
+	# 	return create_model(title, **{
+	# 		k: (type(s, [title, k]), ...)
+	# 		for k, s in props.items()
+	# 	})
+
 	@classmethod
 	def jsonschema_to_basemodel(cls, schema: dict) -> type[BaseModel]:
+		def convert(s, path):
+			t = s.get('type')
+			if t == 'object':
+				props = s.get('properties', {})
+				return create_model(
+					'_'.join(path),
+					__config__ = type('Config', (), {'extra': 'allow'}),
+					**{k: (convert(v, path + [k]), ...) for k, v in props.items()}
+				)
+			if t == 'array':
+				return List[convert(s.get('items', {}), path + ['Item'])]
+			match t:
+				case 'string'  : return str
+				case 'number'  : return float
+				case 'integer' : return int
+				case 'boolean' : return bool
+			raise DatumSchemaError(f'Unknown or missing type: {".".join(path)}')
+
 		title = schema.get('title')
 		props = schema.get('properties')
-
 		if not isinstance(title, str)  : raise DatumSchemaError('Schema must have a valid "title"')
 		if not isinstance(props, dict) : raise DatumSchemaError('Schema must have a "properties" object')
 
-		map = {
-			'boolean' : bool,
-			'integer' : int,
-			'number'  : float,
-			'string'  : str,
-		}
+		return create_model(
+			title,
+			__config__ = type('Config', (), {'extra': 'allow'}),
+			**{k: (convert(s, [title, k]), ...) for k, s in props.items()}
+		)
 
-		def type(s, path):
-			t = s.get('type')
-			if t in map      : return map[t]
-			if t == 'array'  : return List[type(s.get('items', {}), path + ['Item'])]
-			if t == 'object' : return cls.jsonschema_to_basemodel({
-				'title'      : '_'.join(path),
-				'properties' : s.get('properties', {})
-			})
-			raise DatumSchemaError(f'Unsupported or missing type for property: {".".join(path)}')
-
-		return create_model(title, **{
-			k: (type(s, [title, k]), ...)
-			for k, s in props.items()
-		})
 
 	@classmethod
 	def dereference_schema(cls, schema: dict) -> dict:

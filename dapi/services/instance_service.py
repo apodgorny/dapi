@@ -25,6 +25,10 @@ class InstanceService(DapiService):
 		datum_input  = await self.dapi.operator_service.get_input_datum(operator.name)
 		datum_output = await self.dapi.operator_service.get_output_datum(operator.name)
 
+		# print('INVOKE ATOMIC', instance.input)
+		# print('CONVERT', datum_input.from_dict(instance.input).to_dict())
+		# print('SCHEMA', datum_input.to_json(schema=True))
+
 		result = await interpreter.invoke(
 			operator_name = operator.name,
 			code          = operator.code,
@@ -37,6 +41,7 @@ class InstanceService(DapiService):
 		self.dapi.db.commit()
 
 	async def create(self, operator_name: str, instance_name: str = None, input_data: dict = {}) -> OperatorInstanceSchema:
+		# print('INSTANCE SERVICE', f'creating instance `{operator_name}` with input', input_data)
 		instance_id = str(uuid4())
 		instance = OperatorInstanceRecord(
 			id         = instance_id,

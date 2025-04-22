@@ -49,6 +49,14 @@ class MiniPython:
 			'int' : int,  'float': float, 'bool': bool,
 			'set' : set,  'tuple': tuple
 		}
+		
+		# Add built-in functions to the environment
+		self.builtins = {
+			'print': print,
+			'len': len,
+			'type': type,
+			'isinstance': isinstance
+		}
 
 		for op in operators:
 			name = op['name']
@@ -56,7 +64,7 @@ class MiniPython:
 			if op.get('interpreter') == 'python' and isinstance(code, str):
 				tree = ast.parse(code)
 				for node in tree.body:
-					if isinstance(node, ast.FunctionDef) and node.name == name:
+					if (isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef)) and node.name == name:
 						self.functions[name] = node
 			else:
 				self.functions[name] = None
@@ -79,7 +87,7 @@ class MiniPython:
 			raise Exception(f'Root function `{name}` not defined')
 		self._was_called         = True
 		self._root_operator_name = name
-		env = {'input': input_dict, **self.env_types}
+		env = {'input': input_dict, **self.env_types, **self.builtins}
 		self.env_stack.append(env)
 		try:
 			return await self.eval(self.functions[name])
@@ -92,14 +100,20 @@ class MiniPython:
 		self.call_stack.append((func, line))
 		try:
 			match node:
+				case ast.Await():
+					value = await self.eval(node.value)
+					if hasattr(value, '__await__'):
+						return await value
+					return value
+
 				case ast.Return():
 					return await self.eval(node.value)
 
 				case ast.Attribute():
 					value = await self.eval(node.value)
-					if isinstance(value, dict): return value.get(node.attr)
+					# Standard Python behavior: no special handling for dictionaries
 					if hasattr(value, node.attr): return getattr(value, node.attr)
-					raise Exception(f"Attribute `{node.attr}` not found")
+					raise Exception(f"Attribute `{node.attr}` not found on {type(value).__name__}")
 
 				case ast.Subscript():
 					container = await self.eval(node.value)
@@ -112,13 +126,21 @@ class MiniPython:
 					kwargs    = {kw.arg: await self.eval(kw.value) for kw in node.keywords if kw.arg is not None}
 
 					if isinstance(func_node, ast.Name):
+						# Check if it's a built-in function first
+						if func_node.id in self.builtins:
+							return self.builtins[func_node.id](*args, **kwargs)
+							
+						# Otherwise look in the environment
 						func = None
 						for scope in reversed(self.env_stack):
 							if func_node.id in scope:
 								func = scope[func_node.id]
 								break
+						
 						if callable(func):
 							return await func(*args, **kwargs)
+							
+						# If not in builtins or environment, try as operator
 						return await self.call_operator(func_node.id, {
 							'args'   : args,
 							'kwargs' : kwargs
@@ -138,7 +160,7 @@ class MiniPython:
 						if isinstance(ret, dict): return ret
 					return None
 
-				case ast.FunctionDef():
+				case ast.FunctionDef() | ast.AsyncFunctionDef():
 					for stmt in node.body:
 						ret = await self.eval(stmt)
 						if isinstance(ret, dict): return ret
@@ -237,6 +259,86 @@ class MiniPython:
 						case ast.Mod():  return left % right
 						case _: raise Exception('Unsupported binary operator')
 				
+				case ast.JoinedStr():
+					# Handle f-strings (JoinedStr nodes)
+					result = ''
+					for value in node.values:
+						if isinstance(value, ast.Constant):
+							result += str(value.value)
+						elif isinstance(value, ast.FormattedValue):
+							formatted_value = await self.eval(value.value)
+							result += str(formatted_value)
+						else:
+							raise Exception(f'Unsupported f-string component: {type(value).__name__}')
+					return result
+				
+				case ast.FormattedValue():
+					# This is handled by JoinedStr
+					value = await self.eval(node.value)
+					return str(value)
+				
+				case ast.If():
+					condition = await self.eval(node.test)
+					if condition:
+						for stmt in node.body:
+							ret = await self.eval(stmt)
+							if isinstance(ret, dict): return ret
+					else:
+						for stmt in node.orelse:
+							ret = await self.eval(stmt)
+							if isinstance(ret, dict): return ret
+					return None
+				
+				case ast.Compare():
+					left = await self.eval(node.left)
+					for i, op in enumerate(node.ops):
+						right = await self.eval(node.comparators[i])
+						match op:
+							case ast.Eq(): result = left == right
+							case ast.NotEq(): result = left != right
+							case ast.Lt(): result = left < right
+							case ast.LtE(): result = left <= right
+							case ast.Gt(): result = left > right
+							case ast.GtE(): result = left >= right
+							case ast.Is(): result = left is right
+							case ast.IsNot(): result = left is not right
+							case ast.In(): result = left in right
+							case ast.NotIn(): result = left not in right
+							case _: raise Exception(f'Unsupported comparison operator: {type(op).__name__}')
+						if not result:
+							return False
+						left = right
+					return True
+				
+				case ast.BoolOp():
+					match node.op:
+						case ast.And():
+							for value in node.values:
+								result = await self.eval(value)
+								if not result: return False
+							return True
+						case ast.Or():
+							for value in node.values:
+								result = await self.eval(value)
+								if result: return result
+							return False
+						case _: raise Exception(f'Unsupported boolean operator: {type(node.op).__name__}')
+				
+				case ast.UnaryOp():
+					operand = await self.eval(node.operand)
+					match node.op:
+						case ast.Not(): return not operand
+						case ast.USub(): return -operand
+						case ast.UAdd(): return +operand
+						case _: raise Exception(f'Unsupported unary operator: {type(node.op).__name__}')
+				
+				case ast.IfExp():
+					condition = await self.eval(node.test)
+					if condition:
+						return await self.eval(node.body)
+					else:
+						return await self.eval(node.orelse)
+				
 				case ast.Pass():
 					return None
 
@@ -244,8 +346,10 @@ class MiniPython:
 		except MiniPythonRuntimeError:
 			raise
 		except Exception as e:
+			# Create a more concise error message
+			error_msg = f"{type(e).__name__}: {str(e)}"
 			raise MiniPythonRuntimeError(
-				str(e),
+				error_msg,
 				line  = line,
 				func  = func,
 				stack = list(self.call_stack)
