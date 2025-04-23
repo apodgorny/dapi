@@ -37,6 +37,8 @@ class DapiException(HTTPException):
 
 	@staticmethod
 	def consume(e: Exception) -> 'DapiException':
+		from dapi.lib.mini_python import MiniPythonRuntimeError
+		
 		'''
 		Converts any Exception into a uniform DapiException,
 		preserving structure, avoiding nested wrapping.
@@ -49,6 +51,18 @@ class DapiException(HTTPException):
 
 		if isinstance(e, DapiException):
 			return e  # ✨ Already wrapped — return as is
+
+		if isinstance(e, MiniPythonRuntimeError):
+			return DapiException(
+				status_code = 500,
+				severity    = 'halt',
+				detail      = e.msg,
+				context     = {
+					'line'    : e.line,
+					'operator': e.operator,
+					'trace'   : e.trace
+				}
+			)
 
 		error_type = e.__class__.__name__
 		message    = str(e).strip()

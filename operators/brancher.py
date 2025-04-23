@@ -16,10 +16,10 @@ class brancher(Operator):
 	@classmethod
 	async def invoke(cls, input, config=None):
 		print('globals at load time:', globals().keys())
-		# result = await call({
-		# 	'name' : input['operator'],
-		# 	'data' : input['item']
-		# })
+		result = await call({
+			'name' : input['operator'],
+			'data' : input['item']
+		})
 		# for item in result['items']:
 		# 	print(item)
 		return { 'data' : { 'item' : input['item'] } }

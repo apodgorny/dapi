@@ -11,15 +11,13 @@ class ContinueSignal(Exception) : pass
 
 
 class MiniPythonRuntimeError(Exception):
-	def __init__(self, msg: str, *, line: int = None, func: str = None, stack: list[tuple[str, int]] = None):
-		self.line  = line
-		self.func  = func
-		self.stack = stack or []
-		trace      = '\n'.join(f'  in {f} @ line {l}' for f, l in self.stack)
-		prefix     = f'[{func or "<anonymous>"} @ line {line}]'
-		self.trace = trace
-		self.msg   = msg
-		super().__init__(f'Runtime Error in operator `{func}`: {msg}')
+	def __init__(self, msg: str, *, line: int = None, operator: str = None, stack: list[tuple[str, int]] = None):
+		self.line     = line
+		self.operator = operator
+		self.stack    = stack or []
+		self.trace    = '\n'.join(f'  in {f} @ line {l}' for f, l in self.stack)
+		self.msg      = msg
+		super().__init__(f'Runtime Error in operator `{operator}`: {msg}')
 
 
 class MiniPython:

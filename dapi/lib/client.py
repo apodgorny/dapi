@@ -21,7 +21,8 @@ class Client:
 	def print(*args, **kwargs):
 		kwargs['flush'] = True
 		color = kwargs.pop('color', None)
-		args = [String.color(arg, color) for arg in args]
+		if color:
+			args = [String.color(arg, color) for arg in args]
 		print(*args, **kwargs)
 
 	@staticmethod
@@ -49,7 +50,6 @@ class Client:
 			severity   = detail.get('severity', 'halt')
 			message_raw = detail.get('detail', 'Unknown error')
 
-			# Попробуем извлечь из вложенной строки-словаря
 			try:
 				parsed = ast.literal_eval(message_raw)
 				if isinstance(parsed, dict) and 'detail' in parsed:
@@ -84,16 +84,23 @@ class Client:
 
 	@staticmethod
 	def success(message):
-		Client.print(f"{Client._color('success')}\u2713 {message}{String.RESET}")
+		prefix = String.color('SUCCESS:', Client._color('success'))
+		Client.print(f'{prefix} {message}')
 
 	@staticmethod
 	def error(severity, message):
-		color   = Client._color(severity)
 		message = str(message).replace('\\n', '\n')
-		Client.print(f'{color}{severity.upper()}{String.RESET}: {String.italic(message)}')
+		prefix  = String.color(severity.upper() + ':', Client._color(severity))
+
+		if '\nTraceback' in message:
+			head, trace = message.split('\nTraceback', 1)
+			Client.print(f'{prefix} {head}')
+			Client.print(String.color('Traceback' + trace, String.GRAY))
+		else:
+			Client.print(f'{prefix} {message}')
+
 		if severity == 'halt':
 			exit(1)
-
 
 	@staticmethod
 	def request(method: str, path: str, **kwargs):
@@ -132,11 +139,8 @@ class Client:
 		except httpx.ConnectError as e:
 			Client.error('halt', e)
 		except httpx.HTTPStatusError as e:
-			# print('\nRAW RESPONSE:')
-			# print(e.response.text)  # 💥 вот это
 			severity, message = Client._extract_dapi_error(e.response)
 			Client.error(severity, message)
-
 
 	@staticmethod
 	def create_operator(name, input_type, output_type, code, interpreter, config=None):

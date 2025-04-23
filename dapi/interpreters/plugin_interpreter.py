@@ -36,15 +36,15 @@ class PluginInterpreter(Interpreter):
 			return result['output']
 		return result
 
-	def inject_functions_to_plugin_operator_class(self, operator_class) -> None:
-		'''Inject functions into the actual Python module where the operator class is defined.'''
-		functions = self.dapi.operator_service.plugin_operator_functions
-		module    = sys.modules.get(operator_class.__module__)
-		if not module:
-			raise ImportError(f'Cannot locate module for {operator_class.__module__}')
+	# def inject_functions_to_plugin_operator_class(self, operator_class) -> None:
+	# 	'''Inject functions into the actual Python module where the operator class is defined.'''
+	# 	functions = self.dapi.operator_service.plugin_operator_functions
+	# 	module    = sys.modules.get(operator_class.__module__)
+	# 	if not module:
+	# 		raise ImportError(f'Cannot locate module for {operator_class.__module__}')
 
-		for name, fn in functions.items():
-			setattr(module, name, fn)
+	# 	for name, fn in functions.items():
+	# 		setattr(module, name, fn)
 
 	async def invoke(
 		self,
@@ -60,9 +60,9 @@ class PluginInterpreter(Interpreter):
 
 		self._validate(operator_name, operator_class)
 
-		# Inject plugin functions as globals (e.g. call, print, main, etc.)
-		print('injecting', file_path)
-		self.inject_functions_to_plugin_operator_class(operator_class)
+		# # Inject plugin functions as globals (e.g. call, print, main, etc.)
+		# print('injecting', file_path)
+		# self.inject_functions_to_plugin_operator_class(operator_class)
 
 		config_with_invoke = {
 			**config,
