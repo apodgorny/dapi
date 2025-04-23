@@ -43,18 +43,18 @@ class IdSchema(BaseModel):
 	id: str = Field(..., description='Entity id')
 
 class EmptySchema(BaseModel):
-	pass 
+	pass
 
 
 # TYPE schemas
 ###########################################################################
 
-class TypeSchema(BaseModel):
-	name   : str
-	schema : dict
+# class TypeSchema(BaseModel):
+# 	name   : str
+# 	schema : dict
 
-class TypesSchema(BaseModel):
-	items: List[TypeSchema]
+# class TypesSchema(BaseModel):
+# 	items: List[TypeSchema]
 
 
 # OPERATOR schemas

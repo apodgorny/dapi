@@ -10,6 +10,7 @@ from dapi.lib.client import Client
 
 
 def main():
+	Client.reset()
 	parser = argparse.ArgumentParser(description='Run a DAPI Process from script.')
 	parser.add_argument('path', help='Path to Python process file')
 	
@@ -28,7 +29,6 @@ def main():
 		field_type = model_field.annotation
 		if field_type in [str, int, float] : arg_type = field_type
 		else                               : arg_type = str
-		print(field, model_field.is_required())
 		cli_parser.add_argument(
 			f'--{field}',
 			required = model_field.is_required(),
@@ -38,19 +38,13 @@ def main():
 		if model_field.default is not None and not model_field.default:
 			defaults[field] = model_field.default 
 
-	print('defaults', defaults)
-
 	cli_args   = cli_parser.parse_args(unknown_args)
 	input_dict = vars(cli_args)
 	input_dict = { k : input_dict[k] for k in input_dict if input_dict[k] is not None }
 	input_dict.update(defaults)
 
-	print('input_dict', input_dict)
-
 	Datum(input_type).validate(input_dict)
-	# Client.reset()
 	result = Client.invoke(entry_name, input_dict)
-	print(result)
 
 
 if __name__ == '__main__':

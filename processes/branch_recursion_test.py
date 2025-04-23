@@ -1,35 +1,49 @@
 from dapi.lib import Datum, Operator
+from typing   import Any
 
 
 ################################################################
 
-# Define the square operator class that extends Operator
-class increment(Operator):
+class BrancherFriend(Operator):
+	'''Splits input into a list of sub-items.'''
+
 	class InputType(Datum.Pydantic):
-		x: float
+		s: str
 
 	class OutputType(Datum.Pydantic):
-		x: float
+		items: list[str]
 
 	async def invoke(self, input):
-		x = input['x']
-		return { 'x' : x + 1 }
+		s = input['s']
+		return {
+			'items': [
+				{ 's': s + 'a' },
+				{ 's': s + 'b' },
+				{ 's': s + 'c' }
+			]
+		}
+
 
 ################################################################
 
 class main(Operator):
+	'''Entry point that launches recursive process.'''
+
 	class InputType(Datum.Pydantic):
-		x: float
+		s: str
 
 	class OutputType(Datum.Pydantic):
-		x: float
+		result: dict[str, Any]
 
 	async def invoke(self, input):
-		# Placeholder implementation
-		return { 'x': input['x'] }
+		result = await brancher({
+			'operator' : 'brancher_friend',
+			'item'     : input['s']
+		})
+		return { 'result' : result }
+
 
 ################################################################
 
-# Process class with entry point
 class Process:
-	entry = main  # Set the entry point to the main operator
+	entry = main

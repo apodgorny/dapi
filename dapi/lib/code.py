@@ -22,13 +22,13 @@ class Code:
 		return isinstance(node, ast.ClassDef)
 
 	@staticmethod
-	def _get_code(operator):
+	def _get_code(operator, operator_name):
 		interpreter = Code._get_interpreter(operator)
 		code = ''
 		if interpreter == 'llm':
 			code = operator.code
 		else:
-			code = inspect.getsource(operator.invoke).replace('invoke', operator.__name__, 1)
+			code = inspect.getsource(operator.invoke).replace('invoke', operator_name, 1)
 		return String.unindent(code)
 
 	@staticmethod
@@ -52,16 +52,17 @@ class Code:
 		for node in tree.body:
 			if Code._is_class(node) and Code._is_operator_class(node):
 				operator = getattr(module, node.name, None)
-				operators[node.name] = {
-					'name'        : node.name,
+				operator_name = String.camel_to_snake(node.name)
+				operators[operator_name] = {
+					'name'        : operator_name,
 					'input_type'  : operator.InputType.model_json_schema(),
 					'output_type' : operator.OutputType.model_json_schema(),
-					'code'        : Code._get_code(operator),
+					'code'        : Code._get_code(operator, operator_name),
 					'interpreter' : Code._get_interpreter(operator),
 					'config'      : {}
 				}
 
-		entry_name  = getattr(module.Process.entry, '__name__')
+		entry_name  = String.camel_to_snake(getattr(module.Process.entry, '__name__'))
 
 		return {
 			'operators'  : operators,

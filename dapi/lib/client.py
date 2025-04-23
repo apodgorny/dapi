@@ -1,9 +1,12 @@
 import os, sys, httpx, json
+from pathlib import Path
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from .datum  import Datum
 from .code   import Code
 from .module import Module
+from .string import String
 
 PROJECT_PATH = os.environ.get('PROJECT_PATH')
 DAPI_CODE    = os.path.join(PROJECT_PATH, os.environ.get('DAPI_CODE'))
@@ -12,49 +15,115 @@ DAPI_URL     = os.environ.get('DAPI_URL')
 
 class Client:
 
+	####################################################################################
+
 	@staticmethod
 	def print(*args, **kwargs):
 		kwargs['flush'] = True
+		color = kwargs.pop('color', None)
+		args = [String.color(arg, color) for arg in args]
 		print(*args, **kwargs)
 
 	@staticmethod
 	def _color(severity):
 		return {
-			'fyi'    : '\033[94m',
-			'beware' : '\033[93m',
-			'halt'   : '\033[91m',
-			'success': '\033[92m'
+			'fyi'    : String.LIGHTBLUE,
+			'beware' : String.LIGHTYELLOW,
+			'halt'   : String.LIGHTRED,
+			'success': String.LIGHTGREEN
 		}.get(severity, '')
 
 	@staticmethod
-	def _reset():
-		return '\033[0m'
+	def _highlight(s):
+		return String.highlight(s, {
+			String.CYAN    : 'async def self return await'.split(),
+			String.GRAY    : '{ } [ ] : = - + , . ; \" \''.split(),
+			String.MAGENTA : '( )'.split()
+		})
+
+	@staticmethod
+	def _extract_dapi_error(response: httpx.Response):
+		import ast
+		try:
+			detail     = response.json().get('detail', {})
+			severity   = detail.get('severity', 'halt')
+			message_raw = detail.get('detail', 'Unknown error')
+
+			# Попробуем извлечь из вложенной строки-словаря
+			try:
+				parsed = ast.literal_eval(message_raw)
+				if isinstance(parsed, dict) and 'detail' in parsed:
+					message = parsed['detail']
+				else:
+					message = message_raw
+			except Exception:
+				message = message_raw
+
+			error_type = detail.get('error_type')
+			operator   = detail.get('operator')
+			lineno     = detail.get('line')
+			filename   = detail.get('file')
+			short_file = Path(filename).name if filename else None
+
+			parts = []
+			if error_type : parts.append(error_type)
+			if operator   : parts.append(f'operator: {operator}')
+			if lineno     : parts.append(f'line: {lineno}')
+			if short_file : parts.append(f'file: {short_file}')
+
+			if parts:
+				message += f' ({", ".join(parts)})'
+
+			return severity, message
+
+		except Exception as e:
+			return 'halt', f'Could not parse DAPI error: {e}'
+
+
+	####################################################################################
 
 	@staticmethod
 	def success(message):
-		Client.print(f"{Client._color('success')}✓ {message}{Client._reset()}")
+		Client.print(f"{Client._color('success')}\u2713 {message}{String.RESET}")
 
 	@staticmethod
 	def error(severity, message):
 		color   = Client._color(severity)
-		message = message.replace('\\n', '\n')
-		Client.print(f'{color}{severity.upper()}{Client._reset()}: \x1B[3m{message}\x1B[0m')
+		message = str(message).replace('\\n', '\n')
+		Client.print(f'{color}{severity.upper()}{String.RESET}: {String.italic(message)}')
 		if severity == 'halt':
 			exit(1)
 
+
 	@staticmethod
 	def request(method: str, path: str, **kwargs):
-		Client.print('-' * 40)
-		Client.print(f'Calling `{path}`')
-
+		Client.print('\n' + ('-' * 45) + '\n')
+		Client.print(String.underlined(f'Calling `{path}`'))
+		bar = f'  {"- " * 22}'
 		if 'json' in kwargs:
+			Client.print(f'\n{bar}', color=String.DARK_GRAY)
 			for key, val in kwargs['json'].items():
-				Client.print(f'  {key:<14}: `{val}`')
+				Client.print(f'  {key:<16}{String.color(":", color=String.GRAY)} ', end='')
+				if len(str(val)) < 20:
+					val = Client._highlight(str(val))
+					Client.print(f'`{val}`')
+					Client.print(bar, color=String.DARK_GRAY)
+				elif isinstance(val, dict):
+					val = '    ' + json.dumps(val, indent=4).replace('\n', '\n    ')
+					val = Client._highlight(val)
+					Client.print(f'\n{bar}', color=String.DARK_GRAY)
+					print(val)
+					Client.print(bar, color=String.DARK_GRAY)
+				else:
+					val = str(val).strip()
+					val = Client._highlight(val)
+					Client.print(f'\n{bar}', color=String.DARK_GRAY)
+					Client.print(f'    {val}')
+					Client.print(bar, color=String.DARK_GRAY)
+
 		print()
 		url = f'{DAPI_URL}/{path.lstrip("/")}'
-
-		if 'timeout' not in kwargs:
-			kwargs['timeout'] = 1200.0
+		kwargs.setdefault('timeout', 1200.0)
 
 		try:
 			res = httpx.request(method, url, **kwargs)
@@ -63,36 +132,11 @@ class Client:
 		except httpx.ConnectError as e:
 			Client.error('halt', e)
 		except httpx.HTTPStatusError as e:
-			try:
-				print(json.dumps(e.__dict__, indent=4))
-				detail   = e.response.json()['detail']
-				message  = detail.get('message', 'Unknown error')
-				severity = detail.get('severity', 'halt')
-				Client.error(severity, message)
-			except Exception:
-				Client.print('Error:', e.response.text.replace('\\n', '\n').replace('\\', ''))
+			# print('\nRAW RESPONSE:')
+			# print(e.response.text)  # 💥 вот это
+			severity, message = Client._extract_dapi_error(e.response)
+			Client.error(severity, message)
 
-	############################################################################
-
-	@staticmethod
-	def create_type(name: str, model: Datum.Pydantic):
-		schema = Datum(model).to_dict(schema=True)
-		res = Client.request('POST', '/create_type', json={
-			'name'  : name,
-			'schema': schema
-		})
-		Client.success(f'type `{name}` created')
-		return res
-
-	@staticmethod
-	def delete_type(name: str):
-		res = Client.request('POST', '/delete_type', json={ 'name': name })
-		Client.success(f'type `{name}` deleted')
-		return res
-
-	@staticmethod
-	def list_types():
-		return Client.request('GET', '/list_types')
 
 	@staticmethod
 	def create_operator(name, input_type, output_type, code, interpreter, config=None):
@@ -107,27 +151,33 @@ class Client:
 			data['config'] = config
 
 		res = Client.request('POST', '/create_operator', json=data)
-		Client.success(f'operator `{name}` created')
+		Client.success(f'Operator `{name}` created')
 		return res
 
 	@staticmethod
 	def delete_operator(name: str):
 		res = Client.request('POST', '/delete_operator', json={ 'name': name })
-		Client.success(f'operator `{name}` deleted')
+		Client.success(f'Operator `{name}` deleted')
 		return res
 
 	@staticmethod
 	def list_operators():
-		return Client.request('GET', '/list_operators')
+		return Client.request('POST', '/list_operators', json={})
 
 	@staticmethod
 	def invoke(name: str, input_data: dict):
-		return Client.request('POST', '/invoke_operator', json={
+		res = Client.request('POST', '/invoke_operator', json={
 			'name'  : name,
 			'input' : input_data
 		})
+		Client.success(f'Invoked operator `{name}`:\n')
+		Client.print(Client._highlight(json.dumps(res, indent=4)))
+		return res
 
-	##################################################################################
+	@staticmethod
+	def reset():
+		res = Client.request('POST', '/reset', json={})
+		Client.success(f'{res}')
 
 	@staticmethod
 	def compile(code_path):
@@ -136,11 +186,3 @@ class Client:
 			Client.create_operator(**op_data)
 
 		return definitions
-
-	@staticmethod
-	def reset():
-		print("RESET")
-		for operator in Client.list_operators():
-			Client.delete_operator(operator['name'])
-		for type_ in Client.list_types():
-			Client.delete_type(type_['name'])

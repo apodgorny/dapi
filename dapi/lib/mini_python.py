@@ -2,15 +2,12 @@ import ast
 from typing import Callable, Optional, Awaitable
 
 
-class ExternalOperatorCall(Exception):
-	def __init__(self, operator_name: str, input_data: dict):
-		self.operator_name = operator_name
-		self.input_data    = input_data
-		super().__init__(f'External operator call: `{operator_name}`')
+class MiniPythonExeption(Exception):
+	...
 
 
-class BreakSignal(Exception): pass
-class ContinueSignal(Exception): pass
+class BreakSignal(Exception)    : pass
+class ContinueSignal(Exception) : pass
 
 
 class MiniPythonRuntimeError(Exception):
@@ -22,13 +19,7 @@ class MiniPythonRuntimeError(Exception):
 		prefix     = f'[{func or "<anonymous>"} @ line {line}]'
 		self.trace = trace
 		self.msg   = msg
-		self.data  = {
-			'message': msg,
-			'line'   : line,
-			'func'   : func,
-			'trace'  : self.stack
-		}
-		super().__init__(f'{prefix} {msg}')
+		super().__init__(f'Runtime Error in operator `{func}`: {msg}')
 
 
 class MiniPython:
@@ -73,6 +64,7 @@ class MiniPython:
 		if not self.call_operator_callback:
 			raise Exception('Callback for external operators was not provided')
 		if name not in self.functions:
+			print(self.functions)
 			raise Exception(f'Unknown function call `{name}` in operator `{self._root_operator_name}`')
 		if 'args' in input_dict and len(input_dict['args']) == 1 and not input_dict.get('kwargs'):
 			arg = input_dict['args'][0]
@@ -81,6 +73,7 @@ class MiniPython:
 		return await self.call_operator_callback(name, input_dict)
 
 	async def call_main(self, name: str, input_dict: dict) -> dict:
+		self._operator_name = name
 		if self._was_called:
 			return await self.call_operator(name, input_dict)
 		if name not in self.functions:
@@ -95,7 +88,7 @@ class MiniPython:
 			self.env_stack.pop()
 
 	async def eval(self, node):
-		func = self._root_operator_name or '<anonymous>'
+		func = self._root_operator_name or None
 		line = getattr(node, 'lineno', '?')
 		self.call_stack.append((func, line))
 		try:
@@ -346,14 +339,21 @@ class MiniPython:
 		except MiniPythonRuntimeError:
 			raise
 		except Exception as e:
-			# Create a more concise error message
-			error_msg = f"{type(e).__name__}: {str(e)}"
-			raise MiniPythonRuntimeError(
-				error_msg,
-				line  = line,
-				func  = func,
-				stack = list(self.call_stack)
-			)
+			if e.__class__.__name__ == 'DapiException':
+				raise
+			else:
+				# Извлечь сообщение, если detail — dict с полем 'detail'
+				if isinstance(getattr(e, 'detail', None), dict) and 'detail' in e.detail:
+					error_msg = e.detail['detail']
+				else:
+					error_msg = str(e)
+
+				raise MiniPythonRuntimeError(
+					error_msg,
+					line  = line,
+					func  = self._root_operator_name,
+					stack = list(self.call_stack)
+				)
 		finally:
 			self.call_stack.pop()
 

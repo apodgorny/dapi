@@ -18,6 +18,9 @@ class Operator:
 		self.output  = output
 		self.config  = config
 
+		# Inject other operators, so that they could be used in this scope
+		globals().update(self.config.dapi.operator_service.plugin_operator_functions)
+
 	async def invoke(self) -> Datum:
 		'''Execute operator and return output Datum.'''
 		pass

@@ -4,46 +4,17 @@ from dapi.schemas      import (
 	NameSchema,
 	EmptySchema,
 	StatusSchema,
-	TypeSchema,
-	TypesSchema,
 	OperatorSchema,
 	OperatorsSchema,
 	OperatorInputSchema,
 	OutputSchema
 )
 
-
 dapi = Dapi(
-	# TypeService,
 	OperatorService,
 	InterpreterService,
 	InstanceService
 )
-
-
-# TYPE endpoints
-############################################################################
-
-# @dapi.router.post('/create_type', response_model=TypeSchema)
-# async def create_type(input: TypeSchema):
-# 	await dapi.type_service.create(name=input.name, schema=input.schema)
-# 	return input
-
-# @dapi.router.post('/get_type', response_model=TypeSchema)
-# async def get_type(input: NameSchema):
-# 	record = await dapi.type_service.get(input.name)
-# 	return TypeSchema(name=record['name'], schema=record['schema'])
-
-# @dapi.router.post('/get_all_types', response_model=TypesSchema)
-# async def get_all_types(input: EmptySchema):
-# 	records = await dapi.type_service.get_all()
-# 	return TypesSchema(items=[TypeSchema(name=r['name'], schema=r['schema']) for r in records])
-
-# @dapi.router.post('/delete_type', response_model=StatusSchema)
-# async def delete_type(input: NameSchema):
-# 	await dapi.type_service.delete(input.name)
-# 	return {'status': 'success'}
-
 
 # OPERATOR endpoints
 ############################################################################
@@ -72,6 +43,11 @@ async def invoke_operator(input: OperatorInputSchema):
 	result = await dapi.operator_service.invoke(input.name, input.input)
 	return OutputSchema(output=result if isinstance(result, dict) else {})
 
+@dapi.router.post('/reset', response_model=StatusSchema)
+async def invoke_operator(input: EmptySchema):
+	await dapi.operator_service.truncate()
+	await dapi.instance_service.truncate()
+	return { 'status' : 'success' }
 
 # DYNAMIC fallback
 ############################################################################

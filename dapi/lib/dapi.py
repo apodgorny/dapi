@@ -1,35 +1,14 @@
 import asyncio, traceback
-from typing  import Any, Callable, Type, List, Dict
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 
-from dapi.db         import Base, engine, SessionLocal
-from dapi.lib.string import String
+from enum                 import Enum
+from typing               import Any, Callable, Type, List, Dict
 
-from fastapi          import HTTPException
-from starlette.status import HTTP_400_BAD_REQUEST
-from enum             import Enum
+from fastapi              import APIRouter
+from fastapi.responses    import JSONResponse
 
-
-########################################################################
-
-class DapiException(HTTPException):
-	HALT   = 'halt'    # Client must stop processing
-	BEWARE = 'beware'  # Client may continue
-	FYI    = 'fyi'     # Purely informational
-
-	def __init__(
-		self,
-		status_code : int         = HTTP_400_BAD_REQUEST,
-		detail      : str         = 'An error occurred',
-		severity    : str         = None,
-		headers     : dict | None = None
-	):
-		severity = 'halt' if severity not in ['halt','beware','fyi'] else severity
-		super().__init__(status_code=status_code, detail={
-			'message'  : detail,
-			'severity' : severity,
-		}, headers=headers)
+from dapi.db              import Base, engine, SessionLocal
+from dapi.lib.string      import String
+from .dapi_exception      import DapiException
 
 ########################################################################
 
@@ -70,19 +49,12 @@ class DapiService:
 		print('  -', self.__class__.__name__)
 
 	@classmethod
-	def wrap_exceptions(cls, handler_map=None):
+	def wrap_exceptions(cls):
 		'''Class decorator that wraps all public methods with exception handling.'''
-		handler_map = handler_map or {}
-		
+
 		def handle_exception(e):
-			if isinstance(e, tuple(handler_map.keys())):
-				status, severity = handler_map[type(e)]
-				raise DapiException(status_code=status, detail=str(e), severity=severity)
-			elif isinstance(e, DapiException):
-				raise e
-			else:
-				raise DapiException(status_code=500, detail=f'Unhandled error: {str(e)}', severity='halt')
-		
+			raise DapiException.consume(e)
+
 		def create_wrapper(method):
 			if asyncio.iscoroutinefunction(method):
 				async def wrapper(*args, **kwargs):
@@ -96,7 +68,7 @@ class DapiService:
 						return method(*args, **kwargs)
 					except Exception as e:
 						return handle_exception(e)
-			
+
 			return wrapper
 
 		def decorate(target_cls):
@@ -110,4 +82,3 @@ class DapiService:
 
 		return decorate
 
-########################################################################

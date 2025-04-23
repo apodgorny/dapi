@@ -1,6 +1,5 @@
 from pydantic             import BaseModel
 from dapi.lib.operator    import Operator
-from dapi.lib.mini_python import ExternalOperatorCall
 
 
 class Log(Operator):

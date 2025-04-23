@@ -1,5 +1,36 @@
+import re
+
+
 class String:
 	'''String utilities for formatting, normalization, and validation.'''
+
+	# ANSI styles
+	RESET         = '\033[0m'
+	BOLD          = '\033[1m'
+	ITALIC        = '\033[3m'
+	UNDERLINE     = '\033[4m'
+	STRIKETHROUGH = '\033[9m'
+
+	# ANSI colors
+	BLACK         = '\033[30m'
+	RED           = '\033[31m'
+	GREEN         = '\033[32m'
+	YELLOW        = '\033[33m'
+	BLUE          = '\033[34m'
+	MAGENTA       = '\033[35m'
+	CYAN          = '\033[36m'
+	WHITE         = '\033[37m'
+
+	GRAY          = '\033[90m'
+	LIGHTRED      = '\033[91m'
+	LIGHTGREEN    = '\033[92m'
+	LIGHTYELLOW   = '\033[93m'
+	LIGHTBLUE     = '\033[94m'
+	LIGHTMAGENTA  = '\033[95m'
+	LIGHTCYAN     = '\033[96m'
+	LIGHTWHITE    = '\033[97m'
+	LIGHTGRAY     = GRAY  # alias
+	DARK_GRAY     = '\033[38;5;235m'
 
 	@staticmethod
 	def indent(text: str, prefix: str = '\t') -> str:
@@ -41,4 +72,53 @@ class String:
 
 	@staticmethod
 	def underlined(text: str) -> str:
-		return f'\033[4m{text}\033[0m'
+		'''Underlines the given text.'''
+		return f'{String.UNDERLINE}{text}{String.RESET}'
+
+	@staticmethod
+	def italic(text: str) -> str:
+		'''Italicizes the given text.'''
+		return f'{String.ITALIC}{text}{String.RESET}'
+
+	@staticmethod
+	def strikethrough(text: str) -> str:
+		'''Strikes through the given text.'''
+		return f'{String.STRIKETHROUGH}{text}{String.RESET}'
+
+	@staticmethod
+	def color(text: str, color: str = None) -> str:
+		'''Wraps text in ANSI color. Use constants like String.LIGHTGRAY.'''
+		if not color:
+			return text
+		return f'{color}{text}{String.RESET}'
+
+	@staticmethod
+	def highlight(text: str, highlight_groups: dict[str, list[str]]) -> str:
+		'''
+		Highlights groups of substrings with specified colors.
+
+		Accepts dict like:
+		{
+			String.LIGHTRED   : ['fox', 'jump'],
+			String.LIGHTGREEN : ['dog', 'lazy'],
+		}
+		'''
+		import re
+
+		# Flatten to word → color map
+		word_to_color = {
+			word: color
+			for color, words in highlight_groups.items()
+			for word in words
+		}
+
+		def replacer(match):
+			word = match.group(0)
+			return f'{word_to_color[word]}{word}{String.RESET}'
+
+		# Match longest words first
+		pattern = '|'.join(re.escape(word) for word in sorted(word_to_color, key=len, reverse=True))
+		return re.sub(pattern, replacer, text)
+
+
+

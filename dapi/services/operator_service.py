@@ -13,13 +13,15 @@ OPERATOR_DIR = os.path.join(
 	os.environ.get('OPERATOR_DIR', 'operators')
 )
 
-@DapiService.wrap_exceptions({DatumSchemaError: (400, 'halt')})
+
+@DapiService.wrap_exceptions()
 class OperatorService(DapiService):
 	'''Service for managing operators.'''
 
 	def __init__(self, dapi):
 		print('Initializing service')
-		self.dapi = dapi
+		self.dapi                      = dapi
+		self.plugin_operator_functions = {}
 
 	async def initialize(self):
 		await super().initialize()
@@ -28,10 +30,13 @@ class OperatorService(DapiService):
 	############################################################################
 
 	async def register_plugin_operators(self):
-		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
+		classes   = Module.load_package_classes(Operator, OPERATOR_DIR)
 
 		print(String.underlined('\nLoading operators:'))
 		for name, cls in classes.items():
+			if not hasattr(cls, 'invoke'):  # TODO: Do full validation here next
+				continue
+
 			if is_reserved(name):
 				raise ValueError(f'Can not load operator `{name}` - the name is reserved')
 			try:
@@ -44,7 +49,19 @@ class OperatorService(DapiService):
 					code         = '',
 					description  = (cls.__doc__ or '').strip() or ''
 				)
+				
+				# Create function to inject into plugin operator's scope
+				# to be able to do cool things like 'await call('foobar', data)'
+				# right in the code of operators
+				# Create function to inject into plugin operator's scope
+				async def fn(input_data, cls=cls):
+					return await cls.invoke(input_data, { 'invoke': self.invoke })
+
+				self.plugin_operator_functions[name.lower()] = fn
+
+				# Insert record in db, so that api was able to see it
 				await self.create(schema)
+				
 			except DapiException as e:
 				if e.detail.get('severity') == 'beware':
 					continue
@@ -105,7 +122,6 @@ class OperatorService(DapiService):
 		self.validate_name(schema.name)
 		# await self.validate_io(schema)
 		await self.validate_interpreter(schema.interpreter)
-
 		record = OperatorRecord(**schema.model_dump())
 
 		self.dapi.db.add(record)
@@ -127,6 +143,17 @@ class OperatorService(DapiService):
 	async def delete(self, name: str) -> None:
 		record = self.require(name)
 		self.dapi.db.delete(record)
+		self.dapi.db.commit()
+
+	async def truncate(self) -> None:
+		'''Delete all python operators from the database.'''
+		records = (
+			self.dapi.db.query(OperatorRecord)
+				.filter(OperatorRecord.interpreter.in_(['python', 'llm']))
+				.all()
+		)
+		for record in records:
+			self.dapi.db.delete(record)
 		self.dapi.db.commit()
 
 	async def invoke(self, name: str, input: dict) -> dict:

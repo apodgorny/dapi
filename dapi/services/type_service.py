@@ -2,7 +2,7 @@
 # from dapi.lib import DatumSchemaError, Datum, DapiException, DapiService
 
 
-# @DapiService.wrap_exceptions({DatumSchemaError: (422, 'halt')})
+# @DapiService.wrap_exceptions()
 # class TypeService(DapiService):
 #     '''Service for managing types via FastAPI.'''
 

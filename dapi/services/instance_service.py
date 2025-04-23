@@ -62,6 +62,26 @@ class InstanceService(DapiService):
 
 		return OperatorInstanceSchema.model_validate(instance.to_dict())
 
+	async def get(self, instance_id: str) -> OperatorInstanceSchema:
+		instance = self.dapi.db.query(OperatorInstanceRecord).get(instance_id)
+		if not instance:
+			raise ValueError(f'Instance `{instance_id}` not found')
+		return OperatorInstanceSchema.model_validate(instance.to_dict())
+
+	async def delete(self, instance_id: str) -> None:
+		instance = self.dapi.db.query(OperatorInstanceRecord).get(instance_id)
+		if not instance:
+			raise ValueError(f'Instance `{instance_id}` not found')
+		self.dapi.db.delete(instance)
+		self.dapi.db.commit()
+
+	async def truncate(self) -> None:
+		'''Delete all operators from the database.'''
+		records = self.dapi.db.query(OperatorInstanceRecord).all()
+		for record in records:
+			self.dapi.db.delete(record)
+		self.dapi.db.commit()
+
 	async def invoke(self, instance_id: str) -> OperatorInstanceSchema:
 		instance = self.dapi.db.query(OperatorInstanceRecord).get(instance_id)
 		if not instance:
@@ -81,15 +101,3 @@ class InstanceService(DapiService):
 		self.dapi.db.refresh(instance)
 		return OperatorInstanceSchema.model_validate(instance.to_dict())
 
-	async def get(self, instance_id: str) -> OperatorInstanceSchema:
-		instance = self.dapi.db.query(OperatorInstanceRecord).get(instance_id)
-		if not instance:
-			raise ValueError(f'Instance `{instance_id}` not found')
-		return OperatorInstanceSchema.model_validate(instance.to_dict())
-
-	async def delete(self, instance_id: str) -> None:
-		instance = self.dapi.db.query(OperatorInstanceRecord).get(instance_id)
-		if not instance:
-			raise ValueError(f'Instance `{instance_id}` not found')
-		self.dapi.db.delete(instance)
-		self.dapi.db.commit()

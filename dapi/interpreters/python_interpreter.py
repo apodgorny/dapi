@@ -1,6 +1,6 @@
 import traceback
 
-from dapi.lib             import Datum, Interpreter
+from dapi.lib             import Datum, Interpreter, DapiException
 from dapi.lib.struct      import Struct
 from dapi.lib.mini_python import MiniPython
 
@@ -26,6 +26,7 @@ class PythonInterpreter(Interpreter):
 		config        : dict = {}
 	) -> Datum:
 		operators = await self.dapi.operator_service.get_all()
+		print([o['name'] for o in operators])
 		input_dict = input.to_dict()
 
 		try:
@@ -37,7 +38,7 @@ class PythonInterpreter(Interpreter):
 				input_dict
 			)
 		except Exception as e:
-			raise ValueError(f'Runtime error in `{operator_name}`: {str(e)}')
+			raise DapiException.consume(e)
 
 		output.from_dict(output_dict)
 		return output
