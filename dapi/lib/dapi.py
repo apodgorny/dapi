@@ -61,13 +61,15 @@ class DapiService:
 					try:
 						return await method(*args, **kwargs)
 					except Exception as e:
-						return handle_exception(e)
+						raise
+						# return handle_exception(e)
 			else:
 				def wrapper(*args, **kwargs):
 					try:
 						return method(*args, **kwargs)
 					except Exception as e:
-						return handle_exception(e)
+						raise
+						# return handle_exception(e)
 
 			return wrapper
 

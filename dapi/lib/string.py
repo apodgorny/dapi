@@ -59,6 +59,14 @@ class String:
 		return name.replace('-', '_')
 
 	@staticmethod
+	def snake_to_camel(name: str, capitalize=True) -> str:
+		'''Converts snake_case to CamelCase or camelCase depending on `capitalize` argument value.'''
+		components = name.split('_')
+		if capitalize:
+			return ''.join(x.title() for x in components)
+		return components[0] + ''.join(x.title() for x in components[1:])
+
+	@staticmethod
 	def camel_to_snake(name: str) -> str:
 		'''Converts CamelCase to snake_case (preserving acronyms).'''
 		import re
@@ -91,6 +99,32 @@ class String:
 		if not color:
 			return text
 		return f'{color}{text}{String.RESET}'
+
+	@staticmethod
+	def color_between(
+		text      : str,
+		begin     : str,
+		end       : str,
+		color     : str | None = None,
+		inclusive : bool = True
+	) -> str:
+		if color is None:
+			return text
+
+		pat = re.compile(
+			fr'({re.escape(begin)})(.*?)({re.escape(end)})',
+			re.DOTALL
+		)
+
+		def repl(m: re.Match) -> str:
+			left, middle, right = m.groups()
+			if inclusive:
+				# Красим маркеры + содержимое
+				return String.color(f'{left}{middle}{right}', color)
+			# Красим только середину
+			return f'{left}{String.color(middle, color)}{right}'
+
+		return pat.sub(repl, text)
 
 	@staticmethod
 	def highlight(text: str, highlight_groups: dict[str, list[str]]) -> str:

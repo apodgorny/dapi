@@ -1,4 +1,4 @@
-import os, sys, httpx, json
+import os, sys, httpx, json, ast
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,19 +36,22 @@ class Client:
 
 	@staticmethod
 	def _highlight(s):
-		return String.highlight(s, {
-			String.CYAN    : 'async def self return await'.split(),
-			String.GRAY    : '{ } [ ] : = - + , . ; \" \''.split(),
+		s = String.highlight(s, {
+			String.CYAN    : 'async def self return await class float int str bool'.split(),
+			String.GRAY    : '{ } [ ] : = - + * /, . ; \" \''.split(),
 			String.MAGENTA : '( )'.split()
 		})
+		s = String.color_between(s, '#', '\n', String.GRAY)
+		return s
 
 	@staticmethod
 	def _extract_dapi_error(response: httpx.Response):
-		import ast
+		data = response.json()
 		try:
-			detail     = response.json().get('detail', {})
-			severity   = detail.get('severity', 'halt')
+			detail      = data.get('detail', {})
+			severity    = detail.get('severity', 'halt')
 			message_raw = detail.get('detail', 'Unknown error')
+			trace       = detail.get('trace')
 
 			try:
 				parsed = ast.literal_eval(message_raw)
@@ -74,10 +77,12 @@ class Client:
 			if parts:
 				message += f' ({", ".join(parts)})'
 
-			return severity, message
+			# Append trace as a separate element to be printed later
+			return severity, message, trace
 
 		except Exception as e:
-			return 'halt', f'Could not parse DAPI error: {e}'
+			return 'halt', f'Could not parse DAPI error: {e}\nOriginal error: {json.dumps(data, indent=4)}', None
+
 
 
 	####################################################################################
@@ -139,17 +144,25 @@ class Client:
 		except httpx.ConnectError as e:
 			Client.error('halt', e)
 		except httpx.HTTPStatusError as e:
-			severity, message = Client._extract_dapi_error(e.response)
-			Client.error(severity, message)
+			severity, message, trace = Client._extract_dapi_error(e.response)
+			Client.print(
+				f'{String.color(severity.upper(), Client._color(severity))}: {message}'
+			)
+			if trace:
+				Client.print(String.color(trace, String.GRAY))
+			if severity == 'halt':
+				exit(1)
 
 	@staticmethod
-	def create_operator(name, input_type, output_type, code, interpreter, config=None):
+	def create_operator(name, class_name, input_type, output_type, code, interpreter, description, config=None):
 		data = {
-			'name'       : name,
-			'input_type' : input_type,
-			'output_type': output_type,
-			'code'       : code,
-			'interpreter': interpreter
+			'name'        : name,
+			'class_name'  : class_name,
+			'input_type'  : input_type,
+			'output_type' : output_type,
+			'code'        : code,
+			'interpreter' : interpreter,
+			'description' : description
 		}
 		if config is not None:
 			data['config'] = config
@@ -170,10 +183,7 @@ class Client:
 
 	@staticmethod
 	def invoke(name: str, input_data: dict):
-		res = Client.request('POST', '/invoke_operator', json={
-			'name'  : name,
-			'input' : input_data
-		})
+		res = Client.request('POST', f'/{name}', json=input_data)
 		Client.success(f'Invoked operator `{name}`:\n')
 		Client.print(Client._highlight(json.dumps(res, indent=4)))
 		return res

@@ -1,15 +1,23 @@
 import re
 import json
-from dapi.lib   import Datum, Interpreter
-from dapi.lib.struct import Struct
-from dapi.lib.model import Model
+
+from dapi.lib import (
+	Datum,
+	Interpreter,
+	Struct,
+	Model,
+	DapiException,
+	ExecutionContext
+)
 
 
 class LLMInterpreter(Interpreter):
 	'''
-    Interprets prompts with LLMs using {{input.x}} syntax. 
-    Uses `config` to determine model, temperature, etc.
-    '''
+	Interprets prompts with LLMs using {{input.x}} syntax. 
+	Uses `config` to determine model, temperature, etc.
+	'''
+
+	type = 'llm'
 
 	async def invoke(
 		self,
@@ -17,9 +25,11 @@ class LLMInterpreter(Interpreter):
 		code          : str,
 		input         : Datum,
 		output        : Datum,
-		config        : dict | None = None
+		config        : dict,
+		context       : ExecutionContext
 	) -> Datum:
 
+		if context is None: raise ValueError('ExecutionContext must be explicitly provided')
 		config      = config or {}
 		model_id    = config.get('model_id', 'ollama::gemma3:4b')
 		temperature = config.get('temperature', 0.0)
@@ -36,6 +46,7 @@ class LLMInterpreter(Interpreter):
 			code = code.replace(f'{{{{input.{path}}}}}', str(input[path]))
 
 		model = Model.load(model_id)
+		context.push(operator_name, 1, 'llm')
 
 		try:
 			result = await model(
@@ -48,4 +59,6 @@ class LLMInterpreter(Interpreter):
 			output.from_dict(result)
 			return output
 		except Exception as e:
-			raise ValueError(f'LLM error in `{operator_name}`: {e}')
+			raise DapiException.consume(e)
+		finally:
+			context.pop()

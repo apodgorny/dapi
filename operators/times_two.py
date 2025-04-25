@@ -11,6 +11,5 @@ class TimesTwo(Operator):
 	class OutputType(BaseModel):
 		x: int
 	
-	@classmethod
-	async def invoke(cls, input_data, config=None):
+	async def invoke(self, input_data, config=None):
 		return {'x': input_data['x'] * 2}

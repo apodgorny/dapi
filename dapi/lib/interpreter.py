@@ -1,23 +1,33 @@
-# dapi/lib/interpreter.py
+from abc              import ABC, abstractmethod
+from typing           import Callable, Awaitable, Optional
 
-from abc      import ABC, abstractmethod
-from dapi.lib import Datum
+from dapi.lib.execution_context import ExecutionContext
 
 
 class Interpreter(ABC):
-	'''Base class for all interpreters: python, llm, node, or custom.'''
+	'''Base class for all interpreters (mini, full, llm).'''
 
-	def __init__(self, dapi):
-		self.dapi = dapi
+	def __init__(
+		self,
+		operator_name       : str,
+		operator_class_name : str,
+		operator_code       : str,
+		operator_input      : dict,
+		execution_context   : ExecutionContext,
+		external_callback   : Callable[[str, dict, ExecutionContext], Awaitable[dict]],
+		config              : Optional[dict] = None
+	):
+		self.name       = operator_name
+		self.class_name = operator_class_name
+		self.code       = operator_code
+		self.input      = operator_input
+		self.context    = execution_context
+		self.call       = external_callback
+		self.config     = config or {}
+
+	############################################################################
 
 	@abstractmethod
-	async def invoke(
-		self,
-		operator_name : str,
-		code          : str,
-		input         : Datum,
-		output        : Datum,
-		meta          : dict | None = None
-	) -> Datum:
-		'''Execute operator logic and return populated output Datum.'''
+	async def invoke(self) -> dict:
+		'''Run the interpreter and return the result. Must be implemented by subclasses.'''
 		pass

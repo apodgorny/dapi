@@ -2,10 +2,26 @@ from __future__ import annotations
 
 import os
 import uuid
+import inspect
 
 from dapi.db         import OperatorRecord
-from dapi.lib        import String, Datum, DapiService, DapiException, DatumSchemaError, Operator, Module, is_reserved
 from dapi.schemas    import OperatorSchema
+from dapi.lib        import (
+	String,
+	Datum,
+	DapiService,
+	DapiException,
+	DatumSchemaError,
+	ExecutionContext,
+	Operator,
+	Module,
+	is_reserved
+)
+from dapi.interpreters import (
+	LLMInterpreter,
+	MiniPythonInterpreter,
+	FullPythonInterpreter
+)
 
 
 OPERATOR_DIR = os.path.join(
@@ -20,8 +36,8 @@ class OperatorService(DapiService):
 
 	def __init__(self, dapi):
 		print('Initializing service')
-		self.dapi                      = dapi
-		self.plugin_operator_functions = {}
+		self.dapi         = dapi
+		self.last_context = None
 
 	async def initialize(self):
 		await super().initialize()
@@ -30,38 +46,30 @@ class OperatorService(DapiService):
 	############################################################################
 
 	async def register_plugin_operators(self):
-		classes   = Module.load_package_classes(Operator, OPERATOR_DIR)
+		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
 
 		print(String.underlined('\nLoading operators:'))
-		for name, cls in classes.items():
-			if not hasattr(cls, 'invoke'):  # TODO: Do full validation here next
+		for name, operator_class in classes.items():
+			if not hasattr(operator_class, 'invoke'):
 				continue
 
 			if is_reserved(name):
 				raise ValueError(f'Can not load operator `{name}` - the name is reserved')
+
 			try:
 				print('  -', name)
+				# code = inspect.getsource(operator_class)
 				schema = OperatorSchema(
 					name         = name,
-					interpreter  = 'plugin',
-					input_type   = cls.InputType.model_json_schema(),
-					output_type  = cls.OutputType.model_json_schema(),
+					class_name   = operator_class.__name__,
+					interpreter  = 'full',
+					input_type   = operator_class.InputType.model_json_schema(),
+					output_type  = operator_class.OutputType.model_json_schema(),
 					code         = '',
-					description  = (cls.__doc__ or '').strip() or ''
+					description  = (operator_class.__doc__ or '').strip() or ''
 				)
-				
-				# Create function to inject into plugin operator's scope
-				# to be able to do cool things like 'await call('foobar', data)'
-				# right in the code of operators
-				# Create function to inject into plugin operator's scope
-				async def fn(input_data, cls=cls):
-					return await cls.invoke(input_data, { 'invoke': self.invoke })
-
-				self.plugin_operator_functions[name.lower()] = fn
-
-				# Insert record in db, so that api was able to see it
 				await self.create(schema)
-				
+
 			except DapiException as e:
 				if e.detail.get('severity') == 'beware':
 					continue
@@ -69,14 +77,6 @@ class OperatorService(DapiService):
 			except:
 				print('Failed loading:', name)
 				raise
-
-	async def get_input_datum(self, name: str) -> Datum:
-		operator = self.dapi.db.get(OperatorRecord, name)
-		return Datum(operator.input_type)
-
-	async def get_output_datum(self, name: str) -> Datum:
-		operator = self.dapi.db.get(OperatorRecord, name)
-		return Datum(operator.output_type)
 
 	############################################################################
 
@@ -98,16 +98,6 @@ class OperatorService(DapiService):
 			)
 		return record
 
-	async def validate_io(self, schema):
-		for direction in ('input_type', 'output_type'):
-			type_name = getattr(schema, direction)
-			if not await self.dapi.type_service.has(type_name):
-				raise DapiException(
-					status_code = 404,
-					detail      = f'Type `{type_name}` specified in `{schema.name}.{direction}` does not exist',
-					severity    = DapiException.HALT
-				)
-
 	async def validate_interpreter(self, interpreter):
 		if not await self.dapi.interpreter_service.has(interpreter):
 			raise DapiException(
@@ -116,17 +106,21 @@ class OperatorService(DapiService):
 				severity    = DapiException.HALT
 			)
 
+	def get_execution_context(self):
+		return self.last_context
+
 	############################################################################
 
 	async def create(self, schema: OperatorSchema) -> str:
-		self.validate_name(schema.name)
-		# await self.validate_io(schema)
-		await self.validate_interpreter(schema.interpreter)
-		record = OperatorRecord(**schema.model_dump())
-
-		self.dapi.db.add(record)
-		self.dapi.db.commit()
-		return schema.name
+		try:
+			self.validate_name(schema.name)
+			await self.validate_interpreter(schema.interpreter)
+			record = OperatorRecord(**schema.model_dump())
+			self.dapi.db.add(record)
+			self.dapi.db.commit()
+			return schema.name
+		except Exception as e:
+			print(e)
 
 	async def get(self, name: str) -> dict:
 		record = self.require(name)
@@ -134,7 +128,7 @@ class OperatorService(DapiService):
 
 	async def get_all(self) -> list[dict]:
 		return [op.to_dict() for op in self.dapi.db.query(OperatorRecord).all()]
-		
+
 	async def get_operator_sources(self) -> list[str]:
 		"""Get a list of all operator names/sources."""
 		operators = await self.get_all()
@@ -149,21 +143,39 @@ class OperatorService(DapiService):
 		'''Delete all python operators from the database.'''
 		records = (
 			self.dapi.db.query(OperatorRecord)
-				.filter(OperatorRecord.interpreter.in_(['python', 'llm']))
+				.filter(OperatorRecord.interpreter.in_(['mini', 'llm']))
 				.all()
 		)
 		for record in records:
 			self.dapi.db.delete(record)
 		self.dapi.db.commit()
 
-	async def invoke(self, name: str, input: dict) -> dict:
-		# print('[OPERATOR_SERVICE] Invoking', name, 'with input', type(input), input)
-		operator  = self.require(name)
-		# async def create(self, operator_name: str, instance_name: str = None, input_data: dict = {}) -> OperatorInstanceSchema:
-		instance  = await self.dapi.instance_service.create(
-			operator_name = name,
-			input_data    = input
-		)
-		result = await self.dapi.instance_service.invoke(instance.id)
-		# print(f'[OPERATOR_SERVICE] Invoked {name} with result {result}')
-		return result.output
+	async def call_external_operator(self, name: str, input: dict, context: ExecutionContext) -> dict:
+		return await self.invoke(name, input, context)
+
+	async def invoke(self, name: str, input: dict, context: ExecutionContext) -> dict:
+		if context is None:
+			raise ValueError('ExecutionContext must be explicitly provided')
+		
+		self.last_context = context
+		operator = self.require(name)
+
+		if interpreter := self.dapi.interpreter_service.get(operator.interpreter):
+			interpreter_instance = interpreter (
+				operator_name       = name,
+				operator_class_name = operator.class_name,
+				operator_code       = operator.code,
+				operator_input      = input,
+				execution_context   = context,
+				external_callback   = self.call_external_operator,
+				config              = operator.config or {}
+			)
+			return await interpreter_instance.invoke()
+
+		raise DapiException(
+				status_code = 400,
+				detail      = f'Unknown interpreter: `{operator.interpreter}`',
+				severity    = DapiException.HALT
+			)
+
+

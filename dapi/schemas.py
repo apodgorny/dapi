@@ -24,11 +24,9 @@ from enum     import Enum
 ###########################################################################
 
 class InterpreterEnum(str, Enum):
-	python   = 'python'
-	llm      = 'llm'
-	plugin   = 'plugin'   # Executes plugin classes that implement Operator
-	function = 'function'  # Executes a list of transactions defined in meta.definition
-
+	full = 'full'
+	mini = 'mini'
+	llm  = 'llm'
 
 # Generic schemas
 ###########################################################################
@@ -66,6 +64,7 @@ class EmptySchema(BaseModel):
 
 class OperatorSchema(BaseModel):
 	name        : str             = Field(...,                  description='Operator name')
+	class_name  : str             = Field(...,                  description='Class name of operator')
 	input_type  : Dict[str, Any]  = Field(...,                  description='Input type name')
 	output_type : Dict[str, Any]  = Field(...,                  description='Output type name')
 	code        : str | None      = Field(None,                 description='Executable code (ignored for functions)')
@@ -134,9 +133,9 @@ class OperatorInputSchema(BaseModel):
 	name  : str
 	input : Dict[str, Any]
 
-class TransactionInputSchema(BaseModel):
-	name  : constr(min_length=1)
-	input : Dict[str, Any]
+# class TransactionInputSchema(BaseModel):
+# 	name  : constr(min_length=1)
+# 	input : Dict[str, Any]
 
 class OutputSchema(BaseModel):
 	output: Dict[str, Any]

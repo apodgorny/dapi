@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dapi.lib          import String, DapiService, DapiException
-from dapi.interpreters import PythonInterpreter, LLMInterpreter, PluginInterpreter
+from dapi.interpreters import MiniPythonInterpreter, FullPythonInterpreter, LLMInterpreter
 
 
 @DapiService.wrap_exceptions()
@@ -9,19 +9,21 @@ class InterpreterService(DapiService):
 	'''Service for executing code across multiple interpreters.'''
 
 	def __init__(self, dapi):
-		self.dapi = dapi
+		super().__init__(dapi)
 		self.interpreters = {
-			'python'   : PythonInterpreter,
-			'llm'      : LLMInterpreter,
-			'plugin'   : PluginInterpreter
+			MiniPythonInterpreter.type : MiniPythonInterpreter,
+			FullPythonInterpreter.type : FullPythonInterpreter,
+			LLMInterpreter.type        : LLMInterpreter
 		}
 
 		print(String.underlined('\nInitializing interpreters'))
 		for name, cls in self.interpreters.items():
-			self.interpreters[name] = cls(dapi)
 			print('  -', name)
 
 	############################################################################
+
+	def get(self, name: str) -> str:
+		return self.interpreters.get(name, None)
 
 	async def has(self, name: str) -> bool:
 		"""Check if the interpreter exists."""

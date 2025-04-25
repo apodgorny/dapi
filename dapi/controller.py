@@ -1,6 +1,6 @@
-from dapi.lib.dapi     import Dapi
-from dapi.services     import OperatorService, InterpreterService, InstanceService
-from dapi.schemas      import (
+from dapi.lib       import Dapi, ExecutionContext
+from dapi.services  import OperatorService, InterpreterService
+from dapi.schemas   import (
 	NameSchema,
 	EmptySchema,
 	StatusSchema,
@@ -12,8 +12,7 @@ from dapi.schemas      import (
 
 dapi = Dapi(
 	OperatorService,
-	InterpreterService,
-	InstanceService
+	InterpreterService
 )
 
 # OPERATOR endpoints
@@ -38,15 +37,15 @@ async def delete_operator(input: NameSchema):
 	await dapi.operator_service.delete(input.name)
 	return {'status': 'success'}
 
-@dapi.router.post('/invoke_operator', response_model=OutputSchema)
-async def invoke_operator(input: OperatorInputSchema):
-	result = await dapi.operator_service.invoke(input.name, input.input)
-	return OutputSchema(output=result if isinstance(result, dict) else {})
+# @dapi.router.post('/invoke_operator', response_model=OutputSchema)
+# async def invoke_operator(input: OperatorInputSchema):
+# 	context = ExecutionContext(root=input.name)
+# 	result  = await dapi.operator_service.invoke(input.name, input.input, context)
+# 	return OutputSchema(output=result if isinstance(result, dict) else {})
 
 @dapi.router.post('/reset', response_model=StatusSchema)
-async def invoke_operator(input: EmptySchema):
+async def reset_operators(input: EmptySchema):
 	await dapi.operator_service.truncate()
-	await dapi.instance_service.truncate()
 	return { 'status' : 'success' }
 
 # DYNAMIC fallback
@@ -54,4 +53,10 @@ async def invoke_operator(input: EmptySchema):
 
 @dapi.router.post('/{operator_name}', include_in_schema=False)
 async def dynamic_operator_handler(operator_name: str, input: dict):
-	return await dapi.operator_service.invoke(operator_name, input)
+	context = ExecutionContext()
+	print('PUSHING ROOT ---------------->', operator_name)
+	context.push(operator_name, 1, 'whoknows')
+
+	print('++++++', context)
+	result  = await dapi.operator_service.invoke(operator_name, input, context)
+	return OutputSchema(output=result if isinstance(result, dict) else {})

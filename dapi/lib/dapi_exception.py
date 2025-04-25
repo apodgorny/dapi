@@ -37,7 +37,9 @@ class DapiException(HTTPException):
 
 	@staticmethod
 	def consume(e: Exception) -> 'DapiException':
+		raise e
 		from dapi.lib.mini_python import MiniPythonRuntimeError
+		error = None
 		
 		'''
 		Converts any Exception into a uniform DapiException,
@@ -50,10 +52,10 @@ class DapiException(HTTPException):
 		# print('==============================\n')
 
 		if isinstance(e, DapiException):
-			return e  # ✨ Already wrapped — return as is
-
-		if isinstance(e, MiniPythonRuntimeError):
-			return DapiException(
+			error = e
+		elif isinstance(e, MiniPythonRuntimeError):
+			print('MPE', str(e))
+			error = DapiException(
 				status_code = 500,
 				severity    = 'halt',
 				detail      = e.msg,
@@ -63,29 +65,32 @@ class DapiException(HTTPException):
 					'trace'   : e.trace
 				}
 			)
+		else:
+			error_type = e.__class__.__name__
+			# print('ELSE', str(e), error_type)
+			message    = str(e).strip()
+			tb_lines   = traceback.extract_tb(e.__traceback__)
+			# print(tb_lines)
+			filename   = tb_lines[-1].filename if tb_lines else '?'
+			lineno     = tb_lines[-1].lineno   if tb_lines else '?'
+			operator   = getattr(e, 'operator', None)
 
-		error_type = e.__class__.__name__
-		message    = str(e).strip()
+			if not operator:
+				for frame in reversed(tb_lines):
+					if 'operators' in frame.filename:
+						operator = Path(frame.filename).stem
+						break
 
-		tb_lines = traceback.extract_tb(e.__traceback__)
-		filename = tb_lines[-1].filename if tb_lines else '?'
-		lineno   = tb_lines[-1].lineno   if tb_lines else '?'
-
-		operator = getattr(e, 'operator', None)
-		if not operator:
-			for frame in reversed(tb_lines):
-				if 'operators' in frame.filename:
-					operator = Path(frame.filename).stem
-					break
-
-		return DapiException(
-			status_code = 500,
-			severity    = DapiException.HALT,
-			detail      = f'{error_type}: {message}',
-			context     = {
-				'error_type': error_type,
-				'file'      : filename,
-				'line'      : lineno,
-				'operator'  : operator
-			}
-		)
+			return DapiException(
+				status_code = 500,
+				severity    = DapiException.HALT,
+				detail      = f'{error_type}: {message}',
+				context     = {
+					'error_type': error_type,
+					'file'      : filename,
+					'line'      : lineno,
+					'operator'  : operator
+				}
+			)
+			
+		return error

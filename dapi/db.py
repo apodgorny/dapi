@@ -80,6 +80,7 @@ class OperatorRecord(Record):
 	__tablename__ = 'operators'
 
 	name         : Mapped[str]             = mapped_column(String(255),                  primary_key=True, comment='Unique operator name')
+	class_name   : Mapped[str]             = mapped_column(String(255),                  nullable=False,   comment='Unique operator class name')
 	description  : Mapped[str]             = mapped_column(Text,                         nullable=True,    comment='Optional operator description')
 	code         : Mapped[str]             = mapped_column(Text,                         nullable=True,    comment='Source code or prompt (or empty for composite)')
 	interpreter  : Mapped[str]             = mapped_column(String(50),                   nullable=False,   comment='Interpreter name (e.g. python, llm, composite)')
@@ -96,23 +97,23 @@ class OperatorInstanceStatus(enum.Enum):
 	invoked = 'invoked'
 	error   = 'error'
 
-class OperatorInstanceRecord(Record):
-	__tablename__ = 'runtime'
+# class OperatorInstanceRecord(Record):
+# 	__tablename__ = 'runtime'
 
-	id          = Column(String(36),                  primary_key=True, default=lambda: str(uuid.uuid4()),     comment='Instance ID')
-	name        = Column(String,                       nullable=True,                                          comment='Optional instance name (used in composite scope)')
-	operator    = Column(String,                       nullable=False,                                         comment='Operator name this instance runs')
+# 	id          = Column(String(36),                  primary_key=True, default=lambda: str(uuid.uuid4()),     comment='Instance ID')
+# 	name        = Column(String,                       nullable=True,                                          comment='Optional instance name (used in composite scope)')
+# 	operator    = Column(String,                       nullable=False,                                         comment='Operator name this instance runs')
 
-	input       = Column(JSON,                         nullable=False,                                         comment='Input data for operator')
-	output      = Column(JSON,                         default=dict,                                           comment='Result of execution')
+# 	input       = Column(JSON,                         nullable=False,                                         comment='Input data for operator')
+# 	output      = Column(JSON,                         default=dict,                                           comment='Result of execution')
 
-	status      = Column(Enum(OperatorInstanceStatus), nullable=False, default=OperatorInstanceStatus.created, comment='Execution status')
-	error       = Column(Text,                         nullable=True,                                          comment='Error message if any')
+# 	status      = Column(Enum(OperatorInstanceStatus), nullable=False, default=OperatorInstanceStatus.created, comment='Execution status')
+# 	error       = Column(Text,                         nullable=True,                                          comment='Error message if any')
 
-	children    = Column(JSON,                         default=list,                                           comment='IDs of child operator instances')
+# 	children    = Column(JSON,                         default=list,                                           comment='IDs of child operator instances')
 
-	created_at  = Column(DateTime,                     default=datetime.utcnow,                                comment='Creation timestamp')
-	invoked_at  = Column(DateTime,                     nullable=True,                                          comment='Time of successful invocation')
+# 	created_at  = Column(DateTime,                     default=datetime.utcnow,                                comment='Creation timestamp')
+# 	invoked_at  = Column(DateTime,                     nullable=True,                                          comment='Time of successful invocation')
 
 
 # # Transactions (ephemeral until invoked)

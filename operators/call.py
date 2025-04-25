@@ -6,24 +6,13 @@ class Call(Operator):
 	'''Triggers external operator call from within mini-python.'''
 
 	class InputType(BaseModel):
-		name : str
-		data : Dict[str, Any] = {}
-		
-		class Config:
-			extra = "allow"  # Allow extra fields in input
+		name   : str
+		kwargs : Dict[str, Any] = {}
 
 	class OutputType(BaseModel):
-		data : dict
+		data : Dict[str, Any]
 
-	@classmethod
-	async def invoke(cls, input, config=None):
-		name = input['name']
-		data = input.get('data', {})
-		
-		if config and 'invoke' in config:
-			result = await config['invoke'](name, {'text': data.get('text', '')})
-			
-			if isinstance(result, dict) and 'output' in result:
-				return {'data': result['output']}
-			
+	async def invoke(self, name, kwargs):
+		print(name, data)
+		result = await self.invoke_operator('log', kwargs, self.execution_context)
 		return {'data': result}

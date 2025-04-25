@@ -11,7 +11,6 @@ class Log(Operator):
 	class OutputType(BaseModel):
 		text : str
 
-	@classmethod
-	async def invoke(cls, input, config=None):
-		print('From operator:', input['text'])
-		return { 'text': 'From operator:' + input['text'] }
+	async def invoke(self, text):
+		print('From operator:', text)
+		return { 'text': 'From operator:' + text }

@@ -17,9 +17,8 @@ class BranchRecursion(Operator):
 		value : dict
 		items : list[Any]
 
-	@classmethod
 	async def invoke(
-		cls,
+		self,
 		input  : dict,
 		config : dict = None
 	) -> dict:
