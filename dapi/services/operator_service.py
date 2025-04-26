@@ -153,31 +153,32 @@ class OperatorService(DapiService):
 		Builds and validates the input dictionary for an operator call
 		from positional args and keyword kwargs.
 		'''
-		# Retrieve operator metadata
 		operator = await self.get(operator_name)
-		expected = operator['input_type'].get('required', [])
+		input_schema = operator['input_type']
+		expected_fields = list(input_schema.get('properties', {}).keys())
+		required_fields = input_schema.get('required', [])
 
-		# Merge args and kwargs into a single provided dictionary
 		provided = {}
-		if args:
-			for param, value in zip(expected, args):
-				provided[param] = value
-		provided.update(kwargs)
 
-		# Validate that all required parameters are present
-		parameters = {}
-		if 'self' in expected and 'self' not in provided:
+		# 1. Map positional args
+		for param, value in zip(expected_fields, args):
+			provided[param] = value
+
+		# 2. Fill missing from kwargs
+		for param in expected_fields:
+			if param not in provided and param in kwargs:
+				provided[param] = kwargs[param]
+
+		# 3. Handle 'self'
+		if 'self' in expected_fields and 'self' not in provided:
 			provided['self'] = None
 
-		# print(self.i, '-' * 40)
-		# print(self.i, f'Expected parameters for `{operator_name}`:', expected)
-		# print(self.i, f'Provided parameters for `{operator_name}`:', provided)
-		# print(self.i, '-' * 40)
-
-		for param in expected:
+		# 4. Validate required fields only
+		parameters = {}
+		for param in expected_fields:
 			if param in provided:
 				parameters[param] = provided[param]
-			else:
+			elif param in required_fields:
 				raise ValueError(f'[OperatorService] Operator `{operator_name}` is missing required parameter: `{param}`')
 
 		return parameters
@@ -257,7 +258,9 @@ class OperatorService(DapiService):
 		
 		self.last_context = context
 		self.i            = context.i
+
 		operator = self.require(name)
+		output   = ''
 
 		if operator.interpreter == 'llm':
 			operator.config['output_schema'] = operator.output_type

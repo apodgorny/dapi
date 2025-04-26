@@ -51,8 +51,8 @@ class ExecutionContext:
 		if self.enable_color:
 			colors = {
 				'llm'  : String.MAGENTA,
-				'full' : String.GREEN,
-				'mini' : String.LIGHTBLUE
+				'mini' : String.GREEN,
+				'full' : String.LIGHTBLUE
 			}
 			interpreter = String.color('▮', colors[interpreter])
 		return interpreter

@@ -9,15 +9,9 @@ class main(Operator):
 	class OutputType(Datum.Pydantic):
 		call_result : dict
 
-	async def invoke(input):
-		call_params = {
-			'name': input['operator'],
-			'data': {
-				'text': input['message']
-			}
-		}
-		result = await call(call_params)
-		return { 'call_result': result }
+	async def invoke(self, operator, message):
+		result = await call(operator, {'text' : message })
+		return result
 
 class Process:
 	entry = main

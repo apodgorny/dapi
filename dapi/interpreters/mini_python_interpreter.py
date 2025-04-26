@@ -23,7 +23,6 @@ class MiniPythonInterpreter(Interpreter):
 			)
 
 			result = await mini_python.invoke()
-			print('mp', result)
 			return result
 
 		except Exception as e:
