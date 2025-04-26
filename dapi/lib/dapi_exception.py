@@ -37,8 +37,8 @@ class DapiException(HTTPException):
 
 	@staticmethod
 	def consume(e: Exception) -> 'DapiException':
-		raise e
-		from dapi.lib.mini_python import MiniPythonRuntimeError
+		# raise e
+		# from dapi.lib.mini_python import MiniPythonRuntimeError
 		error = None
 		
 		'''
@@ -53,18 +53,18 @@ class DapiException(HTTPException):
 
 		if isinstance(e, DapiException):
 			error = e
-		elif isinstance(e, MiniPythonRuntimeError):
-			print('MPE', str(e))
-			error = DapiException(
-				status_code = 500,
-				severity    = 'halt',
-				detail      = e.msg,
-				context     = {
-					'line'    : e.line,
-					'operator': e.operator,
-					'trace'   : e.trace
-				}
-			)
+		# elif isinstance(e, MiniPythonRuntimeError):
+		# 	print('MPE', str(e))
+		# 	error = DapiException(
+		# 		status_code = 500,
+		# 		severity    = 'halt',
+		# 		detail      = e.msg,
+		# 		context     = {
+		# 			'line'    : e.line,
+		# 			'operator': e.operator,
+		# 			'trace'   : e.trace
+		# 		}
+		# 	)
 		else:
 			error_type = e.__class__.__name__
 			# print('ELSE', str(e), error_type)
@@ -80,6 +80,9 @@ class DapiException(HTTPException):
 					if 'operators' in frame.filename:
 						operator = Path(frame.filename).stem
 						break
+
+			# Optional: cut trace
+			traceback.print_exception(type(e), e, e.__traceback__, limit=5)
 
 			return DapiException(
 				status_code = 500,

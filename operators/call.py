@@ -15,4 +15,4 @@ class Call(Operator):
 	async def invoke(self, name, kwargs):
 		print(name, data)
 		result = await self.invoke_operator('log', kwargs, self.execution_context)
-		return {'data': result}
+		return result

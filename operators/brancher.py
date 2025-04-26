@@ -20,4 +20,4 @@ class Brancher(Operator):
 		)
 		# for item in result['items']:
 		# 	print(item)
-		return { 'data' : { 'item' : item } }
+		return item

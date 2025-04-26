@@ -10,16 +10,17 @@ class ModelOpenai(Model):
 		super().__init__(name)
 		self.client = OpenAI()
 
-	def _format(self, schema):
-		schema                         = schema.model_json_schema()
+	def to_json_schema(self, schema):
+		schema                         = super().to_json_schema(schema)
 		schema_name                    = f'{self.__class__.__name__.lower()}_response_schema'
 		schema['type']                 = 'object'
 		schema['additionalProperties'] = False
+
 		return {
-			"type": "json_schema",
-			"json_schema": {
-				"name": schema_name,
-				"schema": schema
+			'type'        : 'json_schema',
+			'json_schema' : {
+				'name'   : schema_name,
+				'schema' : schema
 			}
 		}
 
@@ -33,14 +34,14 @@ class ModelOpenai(Model):
 	) -> dict:
 		messages = []
 		if system:
-			messages.append({"role": "system", "content": system})
-		messages.append({"role": role, "content": prompt})
+			messages.append({'role': 'system', 'content': system})
+		messages.append({'role': role, 'content': prompt})
 
 		params = {
-			"model": self.name,
-			"temperature": temperature,
-			"response_format": self._format(response_schema),
-			"messages": messages
+			'model'           : self.name,
+			'temperature'     : temperature,
+			'response_format' : self.to_json_schema(response_schema),
+			'messages'        : messages
 		}
 
 		try:

@@ -1,64 +1,60 @@
 import re
-import json
-
 from dapi.lib import (
 	Datum,
-	Interpreter,
 	Struct,
 	Model,
 	DapiException,
-	ExecutionContext
+	ExecutionContext,
+	Interpreter
 )
-
 
 class LLMInterpreter(Interpreter):
 	'''
-	Interprets prompts with LLMs using {{input.x}} syntax. 
-	Uses `config` to determine model, temperature, etc.
+	Executes a prompt using LLMs with {{input.x}} variable substitution.
 	'''
 
 	type = 'llm'
 
-	async def invoke(
-		self,
-		operator_name : str,
-		code          : str,
-		input         : Datum,
-		output        : Datum,
-		config        : dict,
-		context       : ExecutionContext
-	) -> Datum:
-
-		if context is None: raise ValueError('ExecutionContext must be explicitly provided')
-		config      = config or {}
-		model_id    = config.get('model_id', 'ollama::gemma3:4b')
-		temperature = config.get('temperature', 0.0)
-		role        = config.get('role', 'user')
-		system      = config.get('system')  # optional
-
-		input_data  = input.to_dict()
-		input_paths = set(m.group(1) for m in re.finditer(r'\{\{\s*input\.([a-zA-Z0-9_.]+)\s*\}\}', code))
-
-		# Replace {{input.x}} → value
-		for path in input_paths:
-			if path not in input:
-				raise ValueError(f'Missing input path `{path}` in operator `{operator_name}`')
-			code = code.replace(f'{{{{input.{path}}}}}', str(input[path]))
-
-		model = Model.load(model_id)
-		context.push(operator_name, 1, 'llm')
-
+	async def invoke(self) -> dict:
 		try:
+			if self.context is None:
+				raise ValueError('ExecutionContext must be explicitly provided')
+
+			config      = self.config or {}
+			model_id    = config.get('model_id', 'ollama::gemma3:4b')
+			temperature = config.get('temperature', 0.0)
+			role        = config.get('role', 'user')
+			system      = config.get('system')
+
+			prompt      = self.code
+			input_data  = self.input
+			output_type = self.config.get('output_schema')
+			if output_type is None:
+				raise ValueError(f'[LLMInterpreter] Missing `output_schema` in config for operator `{self.name}`')
+
+			# Replace {{input.x}} → value
+			input_paths = set(m.group(1) for m in re.finditer(r'\{\{\s*input\.([a-zA-Z0-9_.]+)\s*\}\}', prompt))
+			for path in input_paths:
+				if path not in input_data:
+					raise ValueError(f'[LLMInterpreter] Missing input field `{path}` in operator `{self.name}`')
+				prompt = prompt.replace(f'{{{{input.{path}}}}}', str(input_data[path]))
+
+			model = Model.load(model_id)
+
+			self.context.push(self.name, 1, 'llm')
+
 			result = await model(
-				prompt          = code,
-				response_schema = output.schema,
+				prompt          = prompt,
+				response_schema = output_type,
 				role            = role,
 				temperature     = temperature,
 				system          = system
 			)
-			output.from_dict(result)
-			return output
+
+			return result
+
 		except Exception as e:
 			raise DapiException.consume(e)
+
 		finally:
-			context.pop()
+			self.context.pop()

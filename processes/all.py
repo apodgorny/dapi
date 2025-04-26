@@ -3,21 +3,19 @@ from dapi.lib import Datum, Operator
 
 ################################################################
 
-# Define the square operator class that extends Operator
-class square(Operator):
+class Square(Operator):
 	class InputType(Datum.Pydantic):
 		x: float
 
 	class OutputType(Datum.Pydantic):
 		x: float
 
-	async def invoke(self, input):
-		x = input['x']
-		return { 'x' : x * x }
+	async def invoke(self, x):
+		return x * x
 
 ################################################################
 
-class ollama_add_one(Operator):
+class OllamaAddOne(Operator):
 	class InputType(Datum.Pydantic):
 		x: float
 
@@ -34,26 +32,22 @@ class ollama_add_one(Operator):
 		'temperature' : 0
 	}
 
-
 ################################################################
 
-# Define the double_then_square operator class that extends Operator
-class double_then_square(Operator):
+class DoubleThenSquare(Operator):
 	class InputType(Datum.Pydantic):
 		x: float
 
 	class OutputType(Datum.Pydantic):
 		x: float
 
-	async def invoke(self, input):
-		doubled     = await times_two({'x' : input['x']})           # Plugin
-		squared     = await square({'x': doubled['x']})          # Python
-		incremented = await ollama_add_one({'x': squared['x']})  # LLM
-		return { 'x' : incremented['x'] }
-
+	async def invoke(self, x):
+		x = await times_two(x)       # Plugin
+		x = await square(x)          # Python
+		x = await ollama_add_one(x)  # LLM
+		return x
 
 ################################################################
 
-# Process class with entry point
 class Process:
-	entry = double_then_square  # Set the entry point to the double_then_square operator
+	entry = DoubleThenSquare

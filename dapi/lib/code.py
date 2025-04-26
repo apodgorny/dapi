@@ -69,7 +69,7 @@ class Code:
 					'config'      : {}
 				}
 
-		entry_name = String.camel_to_snake(getattr(module.Process.entry, '__name__'))
+		entry_name = getattr(module.Process.entry, '__name__')
 
 		return {
 			'operators'  : operators,

@@ -1,5 +1,7 @@
 import os
-from dapi.lib import Module
+from pydantic import BaseModel
+
+from dapi.lib import Module, Datum
 
 
 class Model:
@@ -8,6 +10,12 @@ class Model:
 	def __init__(self, name: str):
 		self.name = name
 
+	def to_json_schema(self, schema: any) -> dict:
+		if isinstance(schema, Datum):		                            return schema.to_schema()
+		if isinstance(schema, type) and issubclass(schema, BaseModel):	return schema.model_json_schema()
+		if isinstance(schema, dict):		                            return schema
+		raise ValueError(f'Unsupported schema type: {type(schema).__name__}')
+
 	@classmethod
 	def load(cls, model_id: str) -> 'Model':
 		'''
@@ -15,7 +23,7 @@ class Model:
 		'''
 
 		if '::' not in model_id:
-			raise ValueError(f'Invalid model_id: `{model_id}`. Expected format "provider::name"')
+			raise ValueError(f'Invalid model_id: `{model_id}`. Expected format `provider::name`')
 
 		provider, name = model_id.split('::', 1)
 
@@ -24,8 +32,8 @@ class Model:
 		file_path = os.path.join(root_dir, f'model_{provider}.py')
 
 		try:
-			model_cls = Module.find_class_by_base(cls, file_path)
-			instance  = model_cls(name)
+			model_cls         = Module.find_class_by_base(cls, file_path)
+			instance          = model_cls(name)
 			instance.model_id = model_id
 			return instance
 

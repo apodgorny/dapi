@@ -35,9 +35,9 @@ class OperatorService(DapiService):
 	'''Service for managing operators.'''
 
 	def __init__(self, dapi):
-		print('Initializing service')
 		self.dapi         = dapi
 		self.last_context = None
+		self.i            = ''
 
 	async def initialize(self):
 		await super().initialize()
@@ -56,19 +56,21 @@ class OperatorService(DapiService):
 			if is_reserved(name):
 				raise ValueError(f'Can not load operator `{name}` - the name is reserved')
 
+			with open(os.path.join(OPERATOR_DIR, f'{name}.py')) as f:
+				code = f.read()
+
 			try:
 				print('  -', name)
-				# code = inspect.getsource(operator_class)
 				schema = OperatorSchema(
 					name         = name,
 					class_name   = operator_class.__name__,
 					interpreter  = 'full',
 					input_type   = operator_class.InputType.model_json_schema(),
 					output_type  = operator_class.OutputType.model_json_schema(),
-					code         = '',
+					code         = code,
 					description  = (operator_class.__doc__ or '').strip() or ''
 				)
-				await self.create(schema)
+				await self.create(schema, replace=True)
 
 			except DapiException as e:
 				if e.detail.get('severity') == 'beware':
@@ -81,22 +83,23 @@ class OperatorService(DapiService):
 	############################################################################
 
 	def validate_name(self, name: str) -> None:
-		if self.dapi.db.get(OperatorRecord, name):
+		if is_reserved(name):
 			raise DapiException(
-				status_code = 400,
-				detail      = f'Operator `{name}` already exists',
-				severity    = DapiException.BEWARE
+				status_code = 422,
+				detail      = f'Can not create operator `{name}` - the name is reserved',
+				severity    = DapiException.HALT
 			)
 
 	def require(self, name: str) -> OperatorRecord:
-		record = self.dapi.db.get(OperatorRecord, name)
-		if not record:
+		operator = self.dapi.db.get(OperatorRecord, name)
+		if not operator:
 			raise DapiException(
 				status_code = 404,
 				detail      = f'Operator `{name}` does not exist',
 				severity    = DapiException.HALT
 			)
-		return record
+		operator.config = operator.config if operator.config else {}
+		return operator
 
 	async def validate_interpreter(self, interpreter):
 		if not await self.dapi.interpreter_service.has(interpreter):
@@ -111,16 +114,27 @@ class OperatorService(DapiService):
 
 	############################################################################
 
-	async def create(self, schema: OperatorSchema) -> str:
+	def exists(self, name) -> bool:
+		return bool(self.dapi.db.get(OperatorRecord, name))
+
+	async def create(self, schema: OperatorSchema, replace=False) -> bool:
 		try:
 			self.validate_name(schema.name)
+			if self.exists(schema.name):
+				if replace:
+					await self.delete(schema.name)
+					print('exists, replacing')
+				else:
+					print('exists, skipping')
+					return None
+
 			await self.validate_interpreter(schema.interpreter)
 			record = OperatorRecord(**schema.model_dump())
 			self.dapi.db.add(record)
 			self.dapi.db.commit()
 			return schema.name
 		except Exception as e:
-			print(e)
+			pass
 
 	async def get(self, name: str) -> dict:
 		record = self.require(name)
@@ -133,6 +147,82 @@ class OperatorService(DapiService):
 		"""Get a list of all operator names/sources."""
 		operators = await self.get_all()
 		return [op['name'] for op in operators]
+
+	async def get_input_dict(self, operator_name: str, args: list[Any], kwargs: dict[str, Any]) -> dict:
+		'''
+		Builds and validates the input dictionary for an operator call
+		from positional args and keyword kwargs.
+		'''
+		# Retrieve operator metadata
+		record = await self.get(operator_name)
+		expected = record['input_type'].get('required', [])
+
+		# Merge args and kwargs into a single provided dictionary
+		provided = {}
+		if args:
+			for param, value in zip(expected, args):
+				provided[param] = value
+		provided.update(kwargs)
+
+		# Validate that all required parameters are present
+		parameters = {}
+		if 'self' in expected and 'self' not in provided:
+			provided['self'] = None
+
+		print(self.i, '-' * 40)
+		print(self.i, f'Expected parameters for `{operator_name}`:', expected)
+		print(self.i, f'Provided parameters for `{operator_name}`:', provided)
+		print(self.i, '-' * 40)
+
+		for param in expected:
+			if param in provided:
+				parameters[param] = provided[param]
+			else:
+				raise ValueError(f'[OperatorService] Operator `{operator_name}` is missing required parameter: `{param}`')
+
+		return parameters
+
+	async def get_output_dict(self, operator_name: str, output: Any) -> dict:
+		'''
+		Wraps a raw operator output (single value or tuple) into a validated dict
+		according to the operator's OutputType schema.
+		'''
+		# Retrieve operator metadata
+		record          = await self.get(operator_name)
+		expected_fields = list(record['output_type'].get('properties', {}).keys())
+
+		if not expected_fields:
+			raise ValueError(f'[OperatorService] Operator `{operator_name}` has no output fields defined.')
+
+		if len(expected_fields) == 1:
+			# Single field — output must be a single value
+			return { expected_fields[0]: output }
+
+		else:
+			# Multiple fields — output must be a tuple matching the fields
+			if not isinstance(output, tuple):
+				raise ValueError(f'[OperatorService] Operator `{operator_name}` expected a tuple output for fields {expected_fields}, got {type(output).__name__} instead.')
+
+			if len(output) != len(expected_fields):
+				raise ValueError(f'[OperatorService] Operator `{operator_name}` output tuple length mismatch. Expected {len(expected_fields)}, got {len(output)}.')
+
+			return { field: value for field, value in zip(expected_fields, output) }
+
+
+	async def unwrap_output(self, operator_name: str, output_dict: dict) -> Any: # TODO: refactor
+		'''
+		Transforms an output dict into a value or tuple for use inside user code.
+		'''
+		expected_fields = list(output_dict.keys())
+
+		if not expected_fields:
+			return None
+
+		if len(expected_fields) == 1:
+			return output_dict[expected_fields[0]]
+
+		return tuple(output_dict[field] for field in expected_fields)
+
 
 	async def delete(self, name: str) -> None:
 		record = self.require(name)
@@ -150,32 +240,56 @@ class OperatorService(DapiService):
 			self.dapi.db.delete(record)
 		self.dapi.db.commit()
 
-	async def call_external_operator(self, name: str, input: dict, context: ExecutionContext) -> dict:
-		return await self.invoke(name, input, context)
+	async def call_external_operator(self, name: str, args: list, kwargs: dict, context: ExecutionContext, de: str = None) -> Any:
+		'''
+		Handles external operator call by packing input from local variables,
+		invoking the operator, and unpacking the output for use.
+		'''
+		# Step 1: Pack input
+		input_dict  = await self.get_input_dict(name, args, kwargs)
+
+		# Step 2: Full invocation
+		output_dict = await self.invoke(name, input_dict, context)
+
+		# Step 3: Unpack output to tuple
+		result = await self.unwrap_output(name, output_dict)
+
+		return result
 
 	async def invoke(self, name: str, input: dict, context: ExecutionContext) -> dict:
 		if context is None:
 			raise ValueError('ExecutionContext must be explicitly provided')
 		
 		self.last_context = context
+		self.i            = context.i
 		operator = self.require(name)
 
-		if interpreter := self.dapi.interpreter_service.get(operator.interpreter):
-			interpreter_instance = interpreter (
-				operator_name       = name,
-				operator_class_name = operator.class_name,
-				operator_code       = operator.code,
-				operator_input      = input,
-				execution_context   = context,
-				external_callback   = self.call_external_operator,
-				config              = operator.config or {}
-			)
-			return await interpreter_instance.invoke()
+		if operator.interpreter == 'llm':
+			operator.config['output_schema'] = operator.output_type
 
-		raise DapiException(
-				status_code = 400,
-				detail      = f'Unknown interpreter: `{operator.interpreter}`',
-				severity    = DapiException.HALT
-			)
+		try:
+			context.push(name, 1, operator.interpreter)
+			if interpreter := self.dapi.interpreter_service.get(operator.interpreter):
+				interpreter_instance = interpreter (
+					operator_name       = name,
+					operator_class_name = operator.class_name,
+					operator_code       = operator.code,
+					operator_input      = input,
+					execution_context   = context,
+					external_callback   = self.call_external_operator,
+					config              = operator.config
+				)
+				result = await interpreter_instance.invoke()
 
+				# Pack output (wrap value/tuple into output dict)
+				output = await self.get_output_dict(name, result)
 
+				return output
+
+			raise DapiException(
+					status_code = 400,
+					detail      = f'Unknown interpreter: `{operator.interpreter}`',
+					severity    = DapiException.HALT
+				)
+		finally:
+			context.pop()

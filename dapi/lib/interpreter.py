@@ -1,5 +1,5 @@
 from abc              import ABC, abstractmethod
-from typing           import Callable, Awaitable, Optional
+from typing           import Callable, Awaitable, Optional, Any
 
 from dapi.lib.execution_context import ExecutionContext
 
@@ -14,7 +14,7 @@ class Interpreter(ABC):
 		operator_code       : str,
 		operator_input      : dict,
 		execution_context   : ExecutionContext,
-		external_callback   : Callable[[str, dict, ExecutionContext], Awaitable[dict]],
+		external_callback   : Callable[[str, dict, ExecutionContext, str], Awaitable[Any]],
 		config              : Optional[dict] = None
 	):
 		self.name       = operator_name

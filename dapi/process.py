@@ -7,6 +7,7 @@ from dapi.lib.module import Module
 from dapi.lib.datum  import Datum
 from dapi.lib.code   import Code
 from dapi.lib.client import Client
+from dapi.lib.string import String
 
 
 def main():
@@ -44,7 +45,7 @@ def main():
 	input_dict.update(defaults)
 
 	Datum(input_type).validate(input_dict)
-	result = Client.invoke(entry_name, input_dict)
+	result = Client.invoke(String.camel_to_snake(entry_name), input_dict)
 
 
 if __name__ == '__main__':

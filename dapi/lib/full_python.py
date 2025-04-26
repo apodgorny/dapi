@@ -1,86 +1,109 @@
+import os
 import ast
 import types
+import inspect
+import asyncio
 import traceback
+
 from typing import Callable, Any, Optional
 
+from .python import Python
 
-class FullPython:
-    '''Executes arbitrary Python code with hooks for unknown calls and external stack tracing.'''
+# OperatorService.invoke()
+#   ↳ FullPython.__init__()  ──> вызывает Python.__init__() ──> FullPython._initialize()
+#       ↳ _initialize()  ──> _instrument_ast()  (запускает CallRewriter)
+#                       ──> exec(compiled, {'__fullpython_call_with_trace__':self._wrap_call})
+#   ↳ FullPython.invoke()   ──> уже запущенный код «в памяти»  
 
-    def __init__(
-        self,
-        code                   : str,
-        execution_context      : Any,
-        call_external_operator : Callable[[str, list[Any]], Any],
-        globals_dict           : Optional[dict[str, Any]] = None
-    ):
-        self.code                   = code
-        self.context                = execution_context
-        self.call_external_operator = call_external_operator
 
-        compiled = self._instrument_ast(self.code)
-        ctx      = {
-            '__fullpython_call_with_trace__' : self._wrap_call
-        }
-        if globals_dict:
-            ctx.update(globals_dict)
-        exec(compiled, ctx)
-        self.globals = ctx
+class FullPython(Python):
+	'''Executes arbitrary Python code with hooks for unknown calls and external stack tracing.'''
 
-    ############################################################################
+	def _initialize(self):
+		compiled = self._instrument_ast(self.code)
 
-    def _instrument_ast(self, code_str: str) -> types.CodeType:
-        '''Transform code to inject context.push/pop around external operator calls.'''
-        tree = ast.parse(code_str, filename='<fullpython>')
+		ctx = {
+			'__fullpython_call_with_trace__': self._wrap_call
+		}
 
-        class CallRewriter(ast.NodeTransformer):
-            def visit_Call(self, node: ast.Call) -> ast.AST:
-                # Check for unknown name, assume it's external
-                if isinstance(node.func, ast.Name):
-                    name = node.func.id
-                    line = node.lineno
-                    new_node = ast.Call(
-                        func = ast.Name(id='__fullpython_call_with_trace__', ctx=ast.Load()),
-                        args = [
-                            ast.Constant(name),
-                            ast.List(elts=node.args, ctx=ast.Load()),
-                            ast.Constant(line)
-                        ],
-                        keywords = []
-                    )
-                    return ast.copy_location(new_node, node)
-                return self.generic_visit(node)
+		exec(compiled, ctx)
+		self.ctx = ctx  # сохраняем для вызова operator_class
 
-        return compile(CallRewriter().visit(tree), filename='<fullpython>', mode='exec')
+	############################################################################
 
-    ############################################################################
+	def _instrument_ast(self, code_str: str) -> types.CodeType:
+		'''Transform code to inject context.push/pop around external operator calls.'''
+		tree = ast.parse(code_str, filename='<fullpython>')
 
-    def _wrap_call(self, name: str, args: list[Any], line: int) -> Any:
-        '''Wrap call with context push/pop and error transformation.'''
-        self.context.push(name, line)
-        try:
-            return self.call_external_operator(name, args)
-        finally:
-            self.context.pop()
+		class CallRewriter(ast.NodeTransformer):
+			def visit_Call(self, node: ast.Call) -> ast.AST:
+				if isinstance(node.func, ast.Name):
+					kw_dict = ast.Dict(
+						keys   = [ast.Constant(kw.arg) for kw in node.keywords if kw.arg],
+						values = [kw.value for kw in node.keywords if kw.arg]
+					)
+					new_node = ast.Call(
+						func     = ast.Name(id='__fullpython_call_with_trace__', ctx=ast.Load()),
+						args     = [
+							ast.Constant(node.func.id),
+							ast.List(elts=node.args, ctx=ast.Load()),
+							kw_dict,
+							ast.Constant(node.lineno)
+						],
+						keywords = []
+					)
+					return ast.copy_location(new_node, node)
+				return self.generic_visit(node)
 
-    ############################################################################
+		return compile(CallRewriter().visit(tree), filename='<fullpython>', mode='exec')
 
-    async def invoke_class(self, operator_name: str, class_name: str, input_data: dict) -> Any:
-        '''Instantiate the class by class_name and invoke its 'invoke' method with input_data.'''
-        self.context.push(operator_name, 1, 'full')  # Push context for the operator class
-        try:
-            # Find the class in the globals dictionary populated by exec
-            operator_class = self.globals.get(class_name)
-            if not operator_class:
-                raise ValueError(f'Operator class "{class_name}" not found in provided code.')
 
-            # Instantiate the class
-            operator_instance = operator_class()
+	############################################################################
 
-            # Call the invoke() method on the instance and return the result
-            result = await operator_instance.invoke(input_data)
+	def _wrap_call(self, name: str, args_list: list[Any], kwargs_dict: dict, line: int) -> Any:
+	# def _wrap_call(self, name: str, args: list[Any], line: int) -> Any:
+		'''Wrap call with context push/pop and error transformation.'''
+		return asyncio.get_event_loop().run_until_complete(
+			self._wrap_call_async(name, args_list, kwargs_dict, line)
+		)
 
-            return result
+	async def _wrap_call_async(self, name: str, args_list: list[Any], kwargs_dict: dict, line: int) -> Any:
+		self.execution_context.push(name, line)
+		try:
+			return self.call_external_operator(name, kwargs_dict, self.execution_context, de='full')
+		finally:
+			self.execution_context.pop()
 
-        finally:
-            self.context.pop()  # Pop context after invocation
+	############################################################################
+
+	async def _get_invoke_method(self):
+		operator_class = self.ctx.get(self.operator_class_name)
+		if not operator_class:
+			raise ValueError(f'[{self.__class__.__name__}] Class `{self.operator_class_name}` not found in code')
+
+		instance = operator_class()
+		invoke_method = getattr(instance, 'invoke', None)
+
+		if not invoke_method:
+			raise RuntimeError(f'[{self.__class__.__name__}] Method `invoke` not found in `{self.operator_class_name}`')
+
+		return invoke_method
+
+	############################################################################
+
+	async def invoke(self):
+		try:
+			self.execution_context.push(self.operator_name, 1, 'full')
+			invoke_method = await self._get_invoke_method()
+
+			# parameters are ready
+			parameters = dict(self.input)
+
+			#----------------------------------
+			result = await invoke_method(**parameters)
+			#----------------------------------
+			print(self.i, f'{self.operator_class_name}.invoke result', result)
+			return result
+
+		finally:
+			self.execution_context.pop()

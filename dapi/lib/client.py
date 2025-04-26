@@ -198,5 +198,4 @@ class Client:
 		definitions = Code.serialize(code_path)
 		for op_name, op_data in definitions['operators'].items():
 			Client.create_operator(**op_data)
-
 		return definitions

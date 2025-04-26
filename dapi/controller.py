@@ -54,9 +54,5 @@ async def reset_operators(input: EmptySchema):
 @dapi.router.post('/{operator_name}', include_in_schema=False)
 async def dynamic_operator_handler(operator_name: str, input: dict):
 	context = ExecutionContext()
-	print('PUSHING ROOT ---------------->', operator_name)
-	context.push(operator_name, 1, 'whoknows')
-
-	print('++++++', context)
 	result  = await dapi.operator_service.invoke(operator_name, input, context)
 	return OutputSchema(output=result if isinstance(result, dict) else {})
