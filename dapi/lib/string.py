@@ -94,11 +94,25 @@ class String:
 		return f'{String.STRIKETHROUGH}{text}{String.RESET}'
 
 	@staticmethod
-	def color(text: str, color: str = None) -> str:
-		'''Wraps text in ANSI color. Use constants like String.LIGHTGRAY.'''
-		if not color:
-			return text
-		return f'{color}{text}{String.RESET}'
+	def color(text: str, color: str = None, styles: str = '') -> str:
+		'''
+		Wraps text in ANSI color and/or styles.
+		'''
+		parts = []
+
+		if styles:
+			if 'b' in styles : parts.append(String.BOLD)
+			if 'u' in styles : parts.append(String.UNDERLINE)
+			if 'i' in styles : parts.append(String.ITALIC)
+
+		if color:
+			parts.append(color)
+
+		if not parts:
+			return text  # No color, no style, return unchanged
+
+		return f"{''.join(parts)}{text}{String.RESET}"
+
 
 	@staticmethod
 	def color_between(
@@ -106,9 +120,14 @@ class String:
 		begin     : str,
 		end       : str,
 		color     : str | None = None,
+		styles    : str = '',
 		inclusive : bool = True
 	) -> str:
-		if color is None:
+		'''
+		Colorizes text between `begin` and `end` markers,
+		with optional color and styles.
+		'''
+		if color is None and not styles:
 			return text
 
 		pat = re.compile(
@@ -120,39 +139,65 @@ class String:
 			left, middle, right = m.groups()
 			if inclusive:
 				# Красим маркеры + содержимое
-				return String.color(f'{left}{middle}{right}', color)
-			# Красим только середину
-			return f'{left}{String.color(middle, color)}{right}'
+				return String.color(f'{left}{middle}{right}', color, styles)
+			else:
+				# Красим только содержимое
+				return f'{left}{String.color(middle, color, styles)}{right}'
 
 		return pat.sub(repl, text)
 
 	@staticmethod
-	def highlight(text: str, highlight_groups: dict[str, list[str]]) -> str:
+	def highlight(text: str, highlight_groups: dict[tuple[str, str], list[str]]) -> str:
 		'''
-		Highlights groups of substrings with specified colors.
+		Highlights words in text with specified (color, styles).
 
-		Accepts dict like:
+		highlight_groups format:
 		{
-			String.LIGHTRED   : ['fox', 'jump'],
-			String.LIGHTGREEN : ['dog', 'lazy'],
+			(String.LIGHTRED, 'b') : ['fox', 'jump'],
+			(String.LIGHTGREEN, 'u') : ['dog', 'lazy'],
 		}
 		'''
-		import re
+		markers = []
 
-		# Flatten to word → color map
-		word_to_color = {
-			word: color
-			for color, words in highlight_groups.items()
-			for word in words
-		}
+		# Collect all markers manually
+		for (color, styles), words in highlight_groups.items():
+			for word in words:
+				start = 0
+				while True:
+					pos = text.find(word, start)
+					if pos == -1:
+						break
+					markers.append((pos, 'start', color, styles))
+					markers.append((pos + len(word), 'end', color, styles))
+					start = pos + len(word)
 
-		def replacer(match):
-			word = match.group(0)
-			return f'{word_to_color[word]}{word}{String.RESET}'
+		# Sort markers: ends before starts if same position
+		markers.sort(key=lambda x: (x[0], 0 if x[1] == 'end' else 1))
 
-		# Match longest words first
-		pattern = '|'.join(re.escape(word) for word in sorted(word_to_color, key=len, reverse=True))
-		return re.sub(pattern, replacer, text)
+		# Build result
+		result, active, last = [], [], 0
+		for pos, kind, color, styles in markers:
+			if last < pos:
+				result.append(text[last:pos])
+
+			if kind == 'start':
+				active.append((color, styles))
+				result.append(String.color('', color, styles)[:-len(String.RESET)])
+			else:
+				result.append(String.RESET)
+				active.pop()
+				if active:
+					color, styles = active[-1]
+					result.append(String.color('', color, styles)[:-len(String.RESET)])
+
+			last = pos
+
+		result.append(text[last:])
+		if active:
+			result.append(String.RESET)
+
+		return ''.join(result)
+
 
 
 

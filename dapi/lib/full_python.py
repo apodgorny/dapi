@@ -68,7 +68,7 @@ class FullPython(Python):
 		)
 
 	async def _wrap_call_async(self, name: str, args_list: list[Any], kwargs_dict: dict, line: int) -> Any:
-		self.execution_context.push(name, line)
+		self.execution_context.push(name, line, 'full')
 		try:
 			return self.call_external_operator(name, kwargs_dict, self.execution_context, de='full')
 		finally:
@@ -102,7 +102,7 @@ class FullPython(Python):
 			#----------------------------------
 			result = await invoke_method(**parameters)
 			#----------------------------------
-			print(self.i, f'{self.operator_class_name}.invoke result', result)
+			# print(self.i, f'{self.operator_class_name}.invoke result', result)
 			return result
 
 		finally:

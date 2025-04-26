@@ -154,8 +154,8 @@ class OperatorService(DapiService):
 		from positional args and keyword kwargs.
 		'''
 		# Retrieve operator metadata
-		record = await self.get(operator_name)
-		expected = record['input_type'].get('required', [])
+		operator = await self.get(operator_name)
+		expected = operator['input_type'].get('required', [])
 
 		# Merge args and kwargs into a single provided dictionary
 		provided = {}
@@ -169,10 +169,10 @@ class OperatorService(DapiService):
 		if 'self' in expected and 'self' not in provided:
 			provided['self'] = None
 
-		print(self.i, '-' * 40)
-		print(self.i, f'Expected parameters for `{operator_name}`:', expected)
-		print(self.i, f'Provided parameters for `{operator_name}`:', provided)
-		print(self.i, '-' * 40)
+		# print(self.i, '-' * 40)
+		# print(self.i, f'Expected parameters for `{operator_name}`:', expected)
+		# print(self.i, f'Provided parameters for `{operator_name}`:', provided)
+		# print(self.i, '-' * 40)
 
 		for param in expected:
 			if param in provided:
@@ -245,14 +245,9 @@ class OperatorService(DapiService):
 		Handles external operator call by packing input from local variables,
 		invoking the operator, and unpacking the output for use.
 		'''
-		# Step 1: Pack input
-		input_dict  = await self.get_input_dict(name, args, kwargs)
-
-		# Step 2: Full invocation
-		output_dict = await self.invoke(name, input_dict, context)
-
-		# Step 3: Unpack output to tuple
-		result = await self.unwrap_output(name, output_dict)
+		input_dict  = await self.get_input_dict(name, args, kwargs)  # Step 1: Pack input
+		output_dict = await self.invoke(name, input_dict, context)   # Step 2: Full invocation
+		result      = await self.unwrap_output(name, output_dict)    # Step 3: Unpack output to tuple
 
 		return result
 
@@ -268,7 +263,13 @@ class OperatorService(DapiService):
 			operator.config['output_schema'] = operator.output_type
 
 		try:
-			context.push(name, 1, operator.interpreter)
+			context.push(
+				name        = name,
+				lineno      = 1,
+				interpreter = operator.interpreter,
+				importance  = 1,
+				detail      = str(input)
+			)
 			if interpreter := self.dapi.interpreter_service.get(operator.interpreter):
 				interpreter_instance = interpreter (
 					operator_name       = name,
@@ -280,10 +281,7 @@ class OperatorService(DapiService):
 					config              = operator.config
 				)
 				result = await interpreter_instance.invoke()
-
-				# Pack output (wrap value/tuple into output dict)
-				output = await self.get_output_dict(name, result)
-
+				output = await self.get_output_dict(name, result)  # Pack output (wrap value/tuple into output dict)
 				return output
 
 			raise DapiException(
@@ -292,4 +290,4 @@ class OperatorService(DapiService):
 					severity    = DapiException.HALT
 				)
 		finally:
-			context.pop()
+			context.pop(detail=str(output))

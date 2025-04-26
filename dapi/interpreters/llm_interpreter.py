@@ -41,8 +41,6 @@ class LLMInterpreter(Interpreter):
 
 			model = Model.load(model_id)
 
-			self.context.push(self.name, 1, 'llm')
-
 			result = await model(
 				prompt          = prompt,
 				response_schema = output_type,
@@ -50,11 +48,13 @@ class LLMInterpreter(Interpreter):
 				temperature     = temperature,
 				system          = system
 			)
+			
+			# Convert to tuple to match minipython and fullpython
+			result = tuple(result[k] for k in result)
+			if len(result) == 1:
+				result = result[0]
 
 			return result
 
 		except Exception as e:
 			raise DapiException.consume(e)
-
-		finally:
-			self.context.pop()

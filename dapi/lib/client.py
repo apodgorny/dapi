@@ -3,10 +3,11 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from .datum  import Datum
-from .code   import Code
-from .module import Module
-from .string import String
+from .datum     import Datum
+from .code      import Code
+from .module    import Module
+from .string    import String
+from .highlight import Highlight
 
 PROJECT_PATH = os.environ.get('PROJECT_PATH')
 DAPI_CODE    = os.path.join(PROJECT_PATH, os.environ.get('DAPI_CODE'))
@@ -33,16 +34,6 @@ class Client:
 			'halt'   : String.LIGHTRED,
 			'success': String.LIGHTGREEN
 		}.get(severity, '')
-
-	@staticmethod
-	def _highlight(s):
-		s = String.highlight(s, {
-			String.CYAN    : 'async def self return await class float int str bool'.split(),
-			String.GRAY    : '{ } [ ] : = - + * /, . ; \" \''.split(),
-			String.MAGENTA : '( )'.split()
-		})
-		s = String.color_between(s, '#', '\n', String.GRAY)
-		return s
 
 	@staticmethod
 	def _extract_dapi_error(response: httpx.Response):
@@ -117,18 +108,18 @@ class Client:
 			for key, val in kwargs['json'].items():
 				Client.print(f'  {key:<16}{String.color(":", color=String.GRAY)} ', end='')
 				if len(str(val)) < 20:
-					val = Client._highlight(str(val))
+					val = Highlight.python(str(val))
 					Client.print(f'`{val}`')
 					Client.print(bar, color=String.DARK_GRAY)
 				elif isinstance(val, dict):
 					val = '    ' + json.dumps(val, indent=4).replace('\n', '\n    ')
-					val = Client._highlight(val)
+					val = Highlight.python(val)
 					Client.print(f'\n{bar}', color=String.DARK_GRAY)
 					print(val)
 					Client.print(bar, color=String.DARK_GRAY)
 				else:
 					val = str(val).strip()
-					val = Client._highlight(val)
+					val = Highlight.python(val)
 					Client.print(f'\n{bar}', color=String.DARK_GRAY)
 					Client.print(f'    {val}')
 					Client.print(bar, color=String.DARK_GRAY)
@@ -185,7 +176,7 @@ class Client:
 	def invoke(name: str, input_data: dict):
 		res = Client.request('POST', f'/{name}', json=input_data)
 		Client.success(f'Invoked operator `{name}`:\n')
-		Client.print(Client._highlight(json.dumps(res, indent=4)))
+		Client.print(Highlight.python(json.dumps(res, indent=4)))
 		return res
 
 	@staticmethod

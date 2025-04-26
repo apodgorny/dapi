@@ -88,7 +88,7 @@ class MiniPython(Python):
 			async_func = await self.eval(invoke_method)
 			result     = await async_func(**parameters)
 			#----------------------------------
-			print(self.i, f'{self.operator_class_name}.invoke result', result)
+			# print(self.i, f'{self.operator_class_name}.invoke result', result)
 			return result
 		finally:
 			self.env_stack.pop()

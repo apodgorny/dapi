@@ -42,8 +42,8 @@ class DoubleThenSquare(Operator):
 		x: float
 
 	async def invoke(self, x):
-		x = await times_two(x)       # Plugin
-		x = await square(x)          # Python
+		x = await times_two(x)       # Full Python
+		x = await square(x)          # Mini Python
 		x = await ollama_add_one(x)  # LLM
 		return x
 

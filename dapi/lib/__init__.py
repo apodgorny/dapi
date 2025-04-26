@@ -13,6 +13,7 @@ from .model             import Model
 
 from .client            import Client
 from .execution_context import ExecutionContext
+from .highlight         import Highlight
 
 from .reserved          import is_reserved
 from .autoargs          import autoargs, autodecorate
