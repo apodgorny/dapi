@@ -10,17 +10,20 @@ class InterpreterService(DapiService):
 
 	def __init__(self, dapi):
 		super().__init__(dapi)
+
+	############################################################################
+
+	async def initialize(self):
+		await super().initialize()
 		self.interpreters = {
 			MiniPythonInterpreter.type : MiniPythonInterpreter,
 			FullPythonInterpreter.type : FullPythonInterpreter,
 			LLMInterpreter.type        : LLMInterpreter
 		}
 
-		print(String.underlined('\nInitializing interpreters'))
+		print(String.underlined('\nInterpreters'))
 		for name, cls in self.interpreters.items():
 			print('  -', name)
-
-	############################################################################
 
 	def get(self, name: str) -> str:
 		return self.interpreters.get(name, None)

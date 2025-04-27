@@ -45,7 +45,7 @@ async def delete_operator(input: NameSchema):
 
 @dapi.router.post('/reset', response_model=StatusSchema)
 async def reset_operators(input: EmptySchema):
-	await dapi.operator_service.truncate()
+	await dapi.operator_service.delete_all(['llm', 'mini'])
 	return { 'status' : 'success' }
 
 # DYNAMIC fallback

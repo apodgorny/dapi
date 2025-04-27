@@ -8,18 +8,8 @@
     "makefile.configureOnOpen": false,
     "folder-color.pathColors": [
         {
-            "folderPath": "dapi/processes/",
-            "color": "foldercolorizer.color_00ccff",
-            "badge": "🩵"
-        },
-        {
             "folderPath": "dapi/lib/",
             "color": "foldercolorizer.color_ffcc00"
-        },
-        {
-            "folderPath": "dapi/operators/",
-            "badge": "🧡",
-            "color": "foldercolorizer.color_ff9933"
         },
         {
             "folderPath": "dapi/services/",
@@ -28,6 +18,14 @@
         {
             "folderPath": "dapi/interpreters/",
             "color": "foldercolorizer.color_cc0099"
+        },
+        {
+            "folderPath": "dapi/operators/",
+            "color": "foldercolorizer.color_cc6600"
+        },
+        {
+            "folderPath": "dapi/processes/",
+            "color": "foldercolorizer.color_66ccff"
         }
     ]
 }

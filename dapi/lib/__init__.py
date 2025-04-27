@@ -2,7 +2,7 @@ from .dapi              import Dapi, DapiException, DapiService
 from .python            import Python
 from .string            import String
 from .datum             import Datum, DatumSchemaError, DatumError
-from .code              import Code, Operator
+from .code              import Code
 from .mini_python       import MiniPython
 from .full_python       import FullPython
 from .module            import Module

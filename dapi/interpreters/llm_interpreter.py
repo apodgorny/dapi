@@ -5,7 +5,8 @@ from dapi.lib import (
 	Model,
 	DapiException,
 	ExecutionContext,
-	Interpreter
+	Interpreter,
+	Operator
 )
 
 class LLMInterpreter(Interpreter):
@@ -32,14 +33,16 @@ class LLMInterpreter(Interpreter):
 			if output_type is None:
 				raise ValueError(f'[LLMInterpreter] Missing `output_schema` in config for operator `{self.name}`')
 
-			# Replace {{input.x}} → value
-			input_paths = set(m.group(1) for m in re.finditer(r'\{\{\s*input\.([a-zA-Z0-9_.]+)\s*\}\}', prompt))
+			# Replace {{x}} → value
+			input_paths = set(m.group(1) for m in re.finditer(r'\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}', prompt))
 			for path in input_paths:
 				if path not in input_data:
 					raise ValueError(f'[LLMInterpreter] Missing input field `{path}` in operator `{self.name}`')
-				prompt = prompt.replace(f'{{{{input.{path}}}}}', str(input_data[path]))
+				prompt = prompt.replace(f'{{{{{path}}}}}', str(input_data[path]))
 
 			model = Model.load(model_id)
+
+			print(prompt)
 
 			result = await model(
 				prompt          = prompt,
@@ -48,11 +51,12 @@ class LLMInterpreter(Interpreter):
 				temperature     = temperature,
 				system          = system
 			)
-			
+
 			# Convert to tuple to match minipython and fullpython
 			result = tuple(result[k] for k in result)
 			if len(result) == 1:
 				result = result[0]
+
 
 			return result
 

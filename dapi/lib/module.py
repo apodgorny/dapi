@@ -2,7 +2,7 @@ import os
 import importlib.util
 import inspect
 from pathlib import Path
-from typing import Type
+from typing  import Type
 
 
 class Module:

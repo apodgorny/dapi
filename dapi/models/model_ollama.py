@@ -17,8 +17,12 @@ class ModelOllama(Model):
 		output = re.sub(r'<0x([0-9a-fA-F]{2})>', lambda m: chr(int(m[1], 16)),                    output)
 		output = re.sub(r'\\u[0-9a-fA-F]{4}',    lambda m: codecs.decode(m[0], 'unicode_escape'), output)
 
-		try                 : return output.encode('latin1').decode('utf-8')
-		except UnicodeError : pass
+		try:
+			return output.encode('latin1').decode('utf-8')
+		except UnicodeError:
+			print('⚡ UnicodeError caught, returning original output')
+			return output
+
 
 	async def __call__(
 		self,
@@ -46,6 +50,9 @@ class ModelOllama(Model):
 
 		response  = await asyncio.to_thread(self.client.chat, **params)
 		text      = response['message']['content']
+		print('-' * 30)
+		print('OUTPUT', text)
+		print('-' * 30)
 		sanitized = self._sanitize_output(text)
 
 		return json.loads(sanitized)

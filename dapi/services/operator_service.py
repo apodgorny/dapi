@@ -46,9 +46,10 @@ class OperatorService(DapiService):
 	############################################################################
 
 	async def register_plugin_operators(self):
+		await self.delete_all()
 		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
 
-		print(String.underlined('\nLoading operators:'))
+		print(String.underlined('\nFull python operators:'))
 		for name, operator_class in classes.items():
 			if not hasattr(operator_class, 'invoke'):
 				continue
@@ -60,7 +61,7 @@ class OperatorService(DapiService):
 				code = f.read()
 
 			try:
-				print('  -', name)
+				print(f'  - {name}')
 				schema = OperatorSchema(
 					name         = name,
 					class_name   = operator_class.__name__,
@@ -70,6 +71,7 @@ class OperatorService(DapiService):
 					code         = code,
 					description  = (operator_class.__doc__ or '').strip() or ''
 				)
+
 				await self.create(schema, replace=True)
 
 			except DapiException as e:
@@ -79,6 +81,8 @@ class OperatorService(DapiService):
 			except:
 				print('Failed loading:', name)
 				raise
+
+		print()
 
 	############################################################################
 
@@ -112,6 +116,13 @@ class OperatorService(DapiService):
 	def get_execution_context(self):
 		return self.last_context
 
+	def get_operator_class(self, name):
+		operator = self.require(name)
+		globals_dict = {}
+		exec(operator.code, globals_dict)
+		operator_class = globals_dict[class_name]
+		return operator_class
+
 	############################################################################
 
 	def exists(self, name) -> bool:
@@ -120,13 +131,8 @@ class OperatorService(DapiService):
 	async def create(self, schema: OperatorSchema, replace=False) -> bool:
 		try:
 			self.validate_name(schema.name)
-			if self.exists(schema.name):
-				if replace:
-					await self.delete(schema.name)
-					print('exists, replacing')
-				else:
-					print('exists, skipping')
-					return None
+			if self.exists(schema.name) and replace:
+				await self.delete(schema.name)
 
 			await self.validate_interpreter(schema.interpreter)
 			record = OperatorRecord(**schema.model_dump())
@@ -148,13 +154,31 @@ class OperatorService(DapiService):
 		operators = await self.get_all()
 		return [op['name'] for op in operators]
 
+	async def delete(self, name: str) -> None:
+		record = self.require(name)
+		self.dapi.db.delete(record)
+		self.dapi.db.commit()
+
+	async def delete_all(self, which=None) -> None:
+		'''Delete all operators from the database.'''
+		which = ['mini', 'llm', 'full'] if not isinstance(which, list) else which
+		records = (
+			self.dapi.db.query(OperatorRecord)
+				.filter(OperatorRecord.interpreter.in_(which))
+				.all()
+		)
+		for record in records:
+			self.dapi.db.delete(record)
+		self.dapi.db.commit()
+
+
 	async def get_input_dict(self, operator_name: str, args: list[Any], kwargs: dict[str, Any]) -> dict:
 		'''
 		Builds and validates the input dictionary for an operator call
 		from positional args and keyword kwargs.
 		'''
-		operator = await self.get(operator_name)
-		input_schema = operator['input_type']
+		operator        = await self.get(operator_name)
+		input_schema    = operator['input_type']
 		expected_fields = list(input_schema.get('properties', {}).keys())
 		required_fields = input_schema.get('required', [])
 
@@ -225,21 +249,6 @@ class OperatorService(DapiService):
 		return tuple(output_dict[field] for field in expected_fields)
 
 
-	async def delete(self, name: str) -> None:
-		record = self.require(name)
-		self.dapi.db.delete(record)
-		self.dapi.db.commit()
-
-	async def truncate(self) -> None:
-		'''Delete all python operators from the database.'''
-		records = (
-			self.dapi.db.query(OperatorRecord)
-				.filter(OperatorRecord.interpreter.in_(['mini', 'llm']))
-				.all()
-		)
-		for record in records:
-			self.dapi.db.delete(record)
-		self.dapi.db.commit()
 
 	async def call_external_operator(self, name: str, args: list, kwargs: dict, context: ExecutionContext, de: str = None) -> Any:
 		'''

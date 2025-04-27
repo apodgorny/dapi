@@ -1,5 +1,5 @@
 import ast
-from dapi.lib import DapiException, ExecutionContext, String, FullPython, Interpreter
+from dapi.lib import DapiException, ExecutionContext, String, FullPython, Interpreter, Operator
 
 
 class FullPythonInterpreter(Interpreter):

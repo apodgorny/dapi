@@ -31,7 +31,6 @@ class Dapi:
 		
 	async def initialize_services(self):
 		"""Initialize all services asynchronously."""
-		print(String.underlined('\nInitializing services:'))
 		for service_name in dir(self):
 			service = getattr(self, service_name)
 			if isinstance(service, DapiService) and hasattr(service, 'initialize'):
@@ -46,7 +45,7 @@ class DapiService:
 		self.dapi = dapi
 
 	async def initialize(self):
-		print('  -', self.__class__.__name__)
+		pass
 
 	@classmethod
 	def wrap_exceptions(cls):
