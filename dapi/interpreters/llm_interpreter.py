@@ -26,7 +26,7 @@ class LLMInterpreter(Interpreter):
 			temperature = config.get('temperature', 0.0)
 			role        = config.get('role', 'user')
 			system      = config.get('system')
-			prompt      = self.code
+			prompt      = (await self.get_operator_class(self.name)).code
 			input_data  = self.input
 			output_type = self.config.get('output_schema')
 

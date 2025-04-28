@@ -4,6 +4,8 @@ import os
 import uuid
 import inspect
 
+from pydantic        import BaseModel
+
 from dapi.db         import OperatorRecord
 from dapi.schemas    import OperatorSchema
 from dapi.lib        import (
@@ -118,16 +120,22 @@ class OperatorService(DapiService):
 	def get_execution_context(self):
 		return self._last_context
 
-	async def get_operator_class(self, name: str):
-		operator_class = self._operator_classes.get(name, None)
-		if not operator_class:
-			operator = self.require(name)
+	async def get_operator_class(self, operator_name: str):
+		class_name     = String.snake_to_camel(operator_name)
+		operator_class = self._operator_classes.get(class_name, None)
 
-			globals_dict = {}
+		if not operator_class:
+			operator = self.require(operator_name)
+
+			globals_dict = {
+				'Operator'  : Operator,
+				'Datum'     : Datum,
+				'BaseModel' : BaseModel
+			}
 			exec(operator.code, globals_dict)
 
 			operator_class = globals_dict[class_name]
-			self._operator_classes[name] = operator_class
+			self._operator_classes[operator_name] = operator_class
 
 		return operator_class
 

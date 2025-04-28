@@ -23,14 +23,14 @@ class Code:
 
 	@staticmethod
 	def _get_code(operator, node: ast.ClassDef, lines: list[str]) -> str:
-		if Code._get_interpreter(operator) == 'llm':
-			return String.unindent(operator.code).strip()
-		else:
-			'''Return source of class node, unindented, without using inspect.'''
-			start = node.lineno - 1
-			end   = node.end_lineno
-			src   = '\n'.join(lines[start:end])
-			return String.unindent(src)
+		# if Code._get_interpreter(operator) == 'llm':
+		# 	return String.unindent(operator.code).strip()
+		# else:
+		'''Return source of class node, unindented, without using inspect.'''
+		start = node.lineno - 1
+		end   = node.end_lineno
+		src   = '\n'.join(lines[start:end])
+		return String.unindent(src)
 
 	@staticmethod
 	def _get_interpreter(operator):
