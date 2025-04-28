@@ -43,6 +43,26 @@ class OperatorService(DapiService):
 		self._last_context     = None
 		self._operator_classes = {}  # name → operator class
 
+		self._operator_globals = globals_dict = {
+			'Operator'   : Operator,
+			'Datum'      : Datum,
+			'BaseModel'  : BaseModel,
+			'print'      : print,
+			'len'        : len,
+			'type'       : type,
+			'isinstance' : isinstance,
+
+			'list'       : list,
+			'dict'       : dict,
+			'str'        : str,
+			'int'        : int,
+			'float'      : float,
+			'bool'       : bool,
+			'set'        : set,
+			'tuple'      : tuple
+		}
+
+
 	async def initialize(self):
 		await super().initialize()
 		await self._register_plugin_operators()
@@ -127,11 +147,7 @@ class OperatorService(DapiService):
 		if not operator_class:
 			operator = self.require(operator_name)
 
-			globals_dict = {
-				'Operator'  : Operator,
-				'Datum'     : Datum,
-				'BaseModel' : BaseModel
-			}
+			globals_dict = { **self._operator_globals }
 			exec(operator.code, globals_dict)
 
 			operator_class = globals_dict[class_name]
@@ -304,6 +320,7 @@ class OperatorService(DapiService):
 					operator_code          = operator.code,
 					operator_input         = input,
 					execution_context      = context,
+					operator_globals       = self._operator_globals,           
 					call_external_operator = self.call_external_operator,
 					get_operator_class     = self.get_operator_class,
 					config                 = operator.config

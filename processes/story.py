@@ -1,6 +1,10 @@
-from pydantic import BaseModel
-from dapi.lib import Operator
-from typing   import List, Dict, Any, Optional
+import os, sys, asyncio
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from pydantic  import BaseModel
+from wordwield.wordwield import Operator, WordWield as ww
+from typing    import List, Dict, Any, Optional
 
 
 ################################################################
@@ -107,7 +111,7 @@ class Planner(Operator):
 
 ################################################################
 
-class Main(Operator):
+class Story(Operator):
 
 	class InputType(BaseModel):
 		topic  : str
@@ -115,7 +119,7 @@ class Main(Operator):
 		spread : int
 
 	class OutputType(BaseModel):
-		text: str
+		root: dict
 
 	async def invoke(self, topic, depth, spread):
 		idea = await idea(topic)
@@ -135,5 +139,32 @@ class Main(Operator):
 
 ################################################################
 
-class Process:
-	entry = Main
+def main():
+	# Регистрация операторов
+	ww.create_operator(DivergeStory)
+	ww.create_operator(Idea)
+	ww.create_operator(Planner)
+	ww.create_operator(Story)
+
+	# Вызов Story
+	story = ww.invoke('story', {
+		'topic'  : 'Яйцо',
+		'depth'  : 3,
+		'spread' : 3
+	})
+
+	# Отобразить дерево
+	display_tree(story['output']['root'])
+
+
+def display_tree(node, indent=0):
+	'''Recursively prints a tree based on 'in' fields.'''
+	if not node:
+		return
+	print('    ' * indent + str(node.get('in', '')))
+	for child in node.get('out', []):
+		display_tree(child, indent + 1)
+
+
+if __name__ == '__main__':
+	main()

@@ -17,10 +17,12 @@ class FullPythonInterpreter(Interpreter):
 				operator_class_name    = self.class_name,
 				input_dict             = self.input,
 				code                   = self.code,
+
+				execution_context      = self.context,
+				operator_globals       = self.operator_globals,
+
 				call_external_operator = self.call_external_operator,
 				get_operator_class     = self.get_operator_class,
-				execution_context      = self.context,
-				globals_dict           = {}
 			)
 
 			result = await full_python.invoke()

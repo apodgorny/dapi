@@ -22,13 +22,8 @@ class FullPython(Python):
 
 	def _initialize(self):
 		compiled = self._instrument_ast(self.code)
-
-		ctx = {
-			'__fullpython_call_with_trace__' : self._wrap_call_async
-		}
-
-		exec(compiled, ctx)
-		self.ctx = ctx  # сохраняем для вызова operator_class
+		self.globals['_wrap_call_async'] = self._wrap_call_async
+		exec(compiled, self.globals)
 
 	############################################################################
 
@@ -40,7 +35,7 @@ class FullPython(Python):
 			def visit_Call(self, node: ast.Call) -> ast.AST:
 				if isinstance(node.func, ast.Name):
 					func_name = ast.copy_location(
-						ast.Name(id='__fullpython_call_with_trace__', ctx=ast.Load()),
+						ast.Name(id='_wrap_call_async', ctx=ast.Load()),
 						node.func
 					)
 
@@ -54,9 +49,9 @@ class FullPython(Python):
 						node.args[0] if node.args else node
 					)
 
-					kw_keys = [ast.copy_location(ast.Constant(kw.arg), kw.value) for kw in node.keywords if kw.arg]
+					kw_keys   = [ast.copy_location(ast.Constant(kw.arg), kw.value) for kw in node.keywords if kw.arg]
 					kw_values = [kw.value for kw in node.keywords if kw.arg]
-					kw_dict = ast.copy_location(
+					kw_dict   = ast.copy_location(
 						ast.Dict(keys=kw_keys, values=kw_values),
 						node.keywords[0].value if node.keywords else node
 					)
@@ -67,9 +62,9 @@ class FullPython(Python):
 					)
 
 					new_node = ast.Call(
-						func=func_name,
-						args=[arg_func_id, arg_args_list, kw_dict, arg_lineno],
-						keywords=[]
+						func     = func_name,
+						args     = [arg_func_id, arg_args_list, kw_dict, arg_lineno],
+						keywords = []
 					)
 
 					return ast.copy_location(new_node, node)
@@ -95,7 +90,7 @@ class FullPython(Python):
 	############################################################################
 
 	async def _get_invoke_method(self):
-		operator_class = self.ctx.get(self.operator_class_name)
+		operator_class = self.globals.get(self.operator_class_name)
 		if not operator_class:
 			raise ValueError(f'[{self.__class__.__name__}] Class `{self.operator_class_name}` not found in code')
 

@@ -23,7 +23,7 @@ class OllamaAddOne(Operator):
 		x: float
 
 	code = '''
-		'Given a number {{input.x}}, return its increment by one as { "x": input.x + 1 }'
+		'Given a number {{x}}, return its increment by one as { "x": x + 1 }'
 	'''
 
 	interpreter = 'llm'

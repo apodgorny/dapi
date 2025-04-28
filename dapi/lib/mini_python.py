@@ -12,23 +12,12 @@ class MiniPython(Python):
 		self.env_stack = []
 		self.root      = None
 
-		self.env_types = {
-			'list'  : list,
-			'dict'  : dict,
-			'str'   : str,
-			'int'   : int,
-			'float' : float,
-			'bool'  : bool,
-			'set'   : set,
-			'tuple' : tuple
-		}
-
-		self.builtins = {
-			'print'      : print,
-			'len'        : len,
-			'type'       : type,
-			'isinstance' : isinstance
-		}
+		# self.builtins = {
+		# 	'print'      : print,
+		# 	'len'        : len,
+		# 	'type'       : type,
+		# 	'isinstance' : isinstance
+		# }
 
 		self.traceables = (
 			ast.Call,
@@ -139,8 +128,8 @@ class MiniPython(Python):
 					kwargs    = {kw.arg: await self.eval(kw.value) for kw in node.keywords if kw.arg is not None}
 
 					if isinstance(func_node, ast.Name):
-						if func_name in self.builtins:
-							return self.builtins[func_name](*args, **kwargs)
+						if func_name in self.globals:
+							return self.globals[func_name](*args, **kwargs)
 
 						result = await self.call_external_operator(
 							func_name,
