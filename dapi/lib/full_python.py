@@ -102,7 +102,11 @@ class FullPython(Python):
 		async def call_external_operator(name, kwargs):
 			return await self.call_external_operator(name, [], kwargs, self.execution_context, de='full')
 
-		instance = operator_class(call_external_operator, print)
+		instance = operator_class(
+			call_external_operator,
+			self.get_operator_class,
+			print
+		)
 		invoke_method = getattr(instance, 'invoke', None)
 
 		if not invoke_method:

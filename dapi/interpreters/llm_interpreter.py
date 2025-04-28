@@ -26,10 +26,10 @@ class LLMInterpreter(Interpreter):
 			temperature = config.get('temperature', 0.0)
 			role        = config.get('role', 'user')
 			system      = config.get('system')
-
 			prompt      = self.code
 			input_data  = self.input
 			output_type = self.config.get('output_schema')
+
 			if output_type is None:
 				raise ValueError(f'[LLMInterpreter] Missing `output_schema` in config for operator `{self.name}`')
 

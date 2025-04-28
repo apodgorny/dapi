@@ -9,21 +9,23 @@ class Interpreter(ABC):
 
 	def __init__(
 		self,
-		operator_name       : str,
-		operator_class_name : str,
-		operator_code       : str,
-		operator_input      : dict,
-		execution_context   : ExecutionContext,
-		external_callback   : Callable[[str, dict, ExecutionContext, str], Awaitable[Any]],
-		config              : Optional[dict] = None
+		operator_name          : str,
+		operator_class_name    : str,
+		operator_code          : str,
+		operator_input         : dict,
+		execution_context      : ExecutionContext,
+		call_external_operator : Callable[[str, dict, ExecutionContext, str], Awaitable[Any]],
+		get_operator_class     : Callable[[str], type],
+		config                 : Optional[dict] = None
 	):
-		self.name       = operator_name
-		self.class_name = operator_class_name
-		self.code       = operator_code
-		self.input      = operator_input
-		self.context    = execution_context
-		self.call       = external_callback
-		self.config     = config or {}
+		self.name                   = operator_name
+		self.class_name             = operator_class_name
+		self.code                   = operator_code
+		self.input                  = operator_input
+		self.context                = execution_context
+		self.call_external_operator = call_external_operator
+		self.get_operator_class     = get_operator_class
+		self.config                 = config or {}
 
 	############################################################################
 

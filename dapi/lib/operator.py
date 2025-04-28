@@ -21,9 +21,23 @@ class Operator:
 	def name(self):
 		return String.camel_to_snake(self.__class__.__name__)
 
-	def __init__(self, call_external_operator=None, real_print=None):
+	@classmethod
+	def input_fields(cls) -> list[str]:
+		return list(cls.InputType.model_fields.keys())
+
+	@classmethod
+	def output_fields(cls) -> list[str]:
+		return list(cls.OutputType.model_fields.keys())
+
+	def __init__(
+		self,
+		call_external_operator = None,
+		get_operator_class     = None,
+		real_print             = None
+	):
 		self.call_external_operator = call_external_operator
-		self.print = real_print
+		self.get_operator_class     = get_operator_class
+		self.print                  = real_print
 
 	async def invoke(self) -> Datum:
 		'''Execute operator and return output Datum.'''

@@ -14,6 +14,16 @@ class Call(Operator):
 		data : Dict[str, Any]
 
 	async def invoke(self, name, kwargs):
+		operator_class  = await self.get_operator_class(name)
+		expected_fields = operator_class().input_fields()
+		missing         = [field for field in expected_fields if field not in kwargs]
+
+		if missing:
+			raise DapiException(
+				status_code = 400,
+				detail      = f'Missing fields {missing} for operator `{name}`'
+		)
+
 		result = await self.call_external_operator(
 			name    = name,
 			kwargs  = kwargs

@@ -35,17 +35,19 @@ class OperatorService(DapiService):
 	'''Service for managing operators.'''
 
 	def __init__(self, dapi):
-		self.dapi         = dapi
-		self.last_context = None
-		self.i            = ''
+		self.dapi = dapi
+		self.i    = ''
+
+		self._last_context     = None
+		self._operator_classes = {}  # name → operator class
 
 	async def initialize(self):
 		await super().initialize()
-		await self.register_plugin_operators()
+		await self._register_plugin_operators()
 
 	############################################################################
 
-	async def register_plugin_operators(self):
+	async def _register_plugin_operators(self):
 		await self.delete_all()
 		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
 
@@ -114,13 +116,19 @@ class OperatorService(DapiService):
 			)
 
 	def get_execution_context(self):
-		return self.last_context
+		return self._last_context
 
-	def get_operator_class(self, name):
-		operator = self.require(name)
-		globals_dict = {}
-		exec(operator.code, globals_dict)
-		operator_class = globals_dict[class_name]
+	async def get_operator_class(self, name: str):
+		operator_class = self._operator_classes.get(name, None)
+		if not operator_class:
+			operator = self.require(name)
+
+			globals_dict = {}
+			exec(operator.code, globals_dict)
+
+			operator_class = globals_dict[class_name]
+			self._operator_classes[name] = operator_class
+
 		return operator_class
 
 	############################################################################
@@ -170,7 +178,6 @@ class OperatorService(DapiService):
 		for record in records:
 			self.dapi.db.delete(record)
 		self.dapi.db.commit()
-
 
 	async def get_input_dict(self, operator_name: str, args: list[Any], kwargs: dict[str, Any]) -> dict:
 		'''
@@ -265,7 +272,7 @@ class OperatorService(DapiService):
 		if context is None:
 			raise ValueError('ExecutionContext must be explicitly provided')
 		
-		self.last_context = context
+		self._last_context = context
 		self.i            = context.i
 
 		operator = self.require(name)
@@ -284,13 +291,14 @@ class OperatorService(DapiService):
 			)
 			if interpreter := self.dapi.interpreter_service.get(operator.interpreter):
 				interpreter_instance = interpreter (
-					operator_name       = name,
-					operator_class_name = operator.class_name,
-					operator_code       = operator.code,
-					operator_input      = input,
-					execution_context   = context,
-					external_callback   = self.call_external_operator,
-					config              = operator.config
+					operator_name          = name,
+					operator_class_name    = operator.class_name,
+					operator_code          = operator.code,
+					operator_input         = input,
+					execution_context      = context,
+					call_external_operator = self.call_external_operator,
+					get_operator_class     = self.get_operator_class,
+					config                 = operator.config
 				)
 				result = await interpreter_instance.invoke()
 				output = await self.get_output_dict(name, result)  # Pack output (wrap value/tuple into output dict)
