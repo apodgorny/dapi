@@ -112,7 +112,7 @@ class Client:
 					Client.print(f'`{val}`')
 					Client.print(bar, color=String.DARK_GRAY)
 				elif isinstance(val, dict):
-					val = '    ' + json.dumps(val, indent=4).replace('\n', '\n    ')
+					val = '    ' + json.dumps(val, ensure_ascii=False, indent=4).replace('\n', '\n    ')
 					val = Highlight.python(val)
 					Client.print(f'\n{bar}', color=String.DARK_GRAY)
 					print(val)
@@ -176,7 +176,7 @@ class Client:
 	def invoke(name: str, input_data: dict):
 		res = Client.request('POST', f'/{name}', json=input_data)
 		Client.success(f'Invoked operator `{name}`:\n')
-		Client.print(Highlight.python(json.dumps(res, indent=4)))
+		Client.print(Highlight.python(json.dumps(res, ensure_ascii=False, indent=4)))
 		return res
 
 	@staticmethod

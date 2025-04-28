@@ -1,156 +1,22 @@
-import json
-from dapi.lib import Datum, Operator
-from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
+from dapi.lib import Operator
+from typing   import List, Dict, Any, Optional
 
 
 ################################################################
 
-class main_input(Datum.Pydantic):
-	depth: int
-	topic: str
-	idea: str = ""  # Add idea with default empty string
+class DivergeStory(Operator):
 
-class main_output(Datum.Pydantic):
-	text: str
+	class InputType(BaseModel):
+		text : str
 
-class main(Operator):
-	async def invoke(input):
-		idea_result = await idea({
-			'topic' : input['topic']
-		})
-		print('IDEA:', idea_result['idea'])
-		tree = await recurse_plan({
-			'topic'       : input['topic'],
-			'idea'        : idea_result['idea'],
-			'breadcrumbs' : [],
+	class OutputType(BaseModel):
+		items : List[str]
 
-			'depth'       : input['depth'],
-			'level'       : 0,
-		})
-		# Remove json dependency - print raw tree instead
-		print("TREE STRUCTURE:", tree)
-		return { 'text': idea_result['idea'] }
-
-
-################################################################
-
-class recurse_plan_input(Datum.Pydantic):
-	topic       : str
-	idea        : str
-	breadcrumbs : List[str]
-
-	level : int = 0
-	depth : int
-
-class recurse_plan_output(Datum.Pydantic):
-	items : List[Dict[str, Any]]  # Using Dict instead of custom type to avoid schema issues
-
-class recurse_plan(Operator):
-	async def invoke(input):
-		level       = input['level']
-		depth       = input['depth']
-		topic       = input['topic']
-		idea        = input['idea']
-		# Ensure breadcrumbs is a list
-		print('type of breadcrumbs', type(input['breadcrumbs']))
-		
-		if not isinstance(input['breadcrumbs'], list):
-			breadcrumbs = []
-			print("WARNING: breadcrumbs is not a list - using empty list instead")
-		else:
-			breadcrumbs = input['breadcrumbs']
-
-		title     = topic if len(breadcrumbs) == 0 else breadcrumbs[-1]
-		bc_string = ('вот эту часть рассказа ' + '→'.join(breadcrumbs)) if breadcrumbs else 'весь текст рассказа'
-
-		indent = '  ' * level
-		print(indent, 'LEVEL', level, '→'.join(breadcrumbs or [topic]))
-
-		children = []
-
-		if level < depth:
-			planner_result = await planner({
-				'topic'       : topic,
-				'idea'        : idea,
-				'breadcrumbs' : bc_string
-			})
-
-			print(indent, '  planner returned', planner_result)
-
-			for subtitle in planner_result['titles']:
-				child_result = await recurse_plan({
-					'level'       : level + 1,
-					'depth'       : depth,
-					'topic'       : topic,
-					'idea'        : idea,
-					'breadcrumbs' : breadcrumbs + [subtitle]
-				})
-
-				child_item = child_result['items'][0]
-				print(indent, '  child item:', child_item)
-
-				children.append(child_item)
-
-		result = {
-			'title': title,
-			'sub'  : children
-		}
-
-		print(indent, 'END LEVEL', level, '→'.join(breadcrumbs or [topic]), 'with', len(children), 'children')
-
-		return { 'items': [result] }
-
-
-################################################################
-
-class recurse_input(Datum.Pydantic):
-	text  : str
-	level : int = 0
-	depth : int
-
-class recurse_output(Datum.Pydantic):
-	items : List[str]
-
-class recurse(Operator):
-	async def invoke(input):
-		level   = input['level']
-		depth   = input['depth']
-		text    = input['text']
-		results = []
-		indent  = '  ' * level
-
-		print(indent, 'BEGIN Level', level)
-		if level < depth:
-			diverged = await diverge_story({
-				'text': text
-			})
-			print(indent, 'Diverged', len(diverged['items']), 'items')
-			for item in diverged['items']:
-				recursed = await recurse({
-					'level' : level + 1,
-					'depth' : depth,
-					'text'  : item
-				})
-				print(indent, 'Recursed', len(recursed['items']), 'items')
-				results += recursed['items']
-		else:
-			results += [text]
-		print(indent, 'END Level', level, 'with', len(results), 'results')
-		return { 'items': results }
-
-################################################################
-
-class diverge_story_input(Datum.Pydantic):
-	text : str
-
-class diverge_story_output(Datum.Pydantic):
-	items : List[str]
-
-class diverge_story(Operator):
 	code = '''
 		Ты — писатель, пишущий художественную прозу на русском языке.
 		Вот отрывок:
-		"{{input.text}}"
+		"{{text}}"
 
 		Развей его в **три части: завязка, накал и кульминационная развязка**.
 		Верни их как список строк под ключом "items" в JSON:
@@ -173,25 +39,26 @@ class diverge_story(Operator):
 
 ################################################################
 
-class idea_input(Datum.Pydantic):
-	topic: str
+class Idea(Operator):
 
-class idea_output(Datum.Pydantic):
-	idea : str
+	class InputType(BaseModel):
+		topic: str
 
-class idea(Operator):
+	class OutputType(BaseModel):
+		idea : str
+
 	code = '''
 		Ты — шаман внимания, знающий как приворожить чувства словами, умеющий приклеить внимание слушателя виртуозно к своим словам.
 		Ты получаешь чувство собственной значимости от того экстаза, который слушатель испытывает от путешествия с тобой в твоё повествование.
 		А значит, и от тебя лично. Ты наслаждаешься этим. Я - твой любимый ученик, пишу рассказ и прошу помочь спланировать его.
 		
-		Мой рассказ на тему "{{input.topic}}". Придумай общую захватывающую идею и вырази её в 3-4 предложениях. Пожалуйста, оформи ТОЛЬКО идею в json formate.
+		Мой рассказ на тему "{{topic}}". Придумай общую захватывающую идею и вырази её в 3-4 предложениях. Пожалуйста, оформи ТОЛЬКО идею в json formate.
 
 		Спасибо.
 	'''
 
 	interpreter = 'llm'
-	config = {
+	config      = {
 		'model_id'    : 'ollama::gemma3:4b',
 		'temperature' : 0.7
 	}
@@ -199,42 +66,74 @@ class idea(Operator):
 
 ################################################################
 
-class planner_input(Datum.Pydantic):
-	topic       : str
-	idea        : str
-	breadcrumbs : str
+class Planner(Operator):
 
-class planner_output(Datum.Pydantic):
-	titles : List[str]
+	class InputType(BaseModel):
+		topic       : str
+		idea        : str
+		item        : str
+		spread      : str
+		breadcrumbs : str
 
-class planner(Operator):
+	class OutputType(BaseModel):
+		items : List[str]
+
 	code = '''
 		Ты — мастер планирования рассказов и книг.
 		Tвоё мастерство - правильно озаглавить части книги, так, чтобы просто читая заголовки было понятно о чем будет глава.
 
-		Идея рассказа на тему "{{input.topic}}" такая:
+		Идея рассказа на тему "{{topic}}" такая:
 
-		"{{input.idea}}"
+		"{{idea}}"
 
-		Раздели {{input.breadcrumbs}} на 3 части и предоставь заголовки.
+		Сейчас работаем над частью {{item}} в разделе {{breadcrumbs}}.
+		Раздели её на {{spread}} части и предоставь заголовки.
 		Сложи их в JSON:
 
 		{
-		  "titles" : ["...", "...", "..." ]
+		  "items" : ["...", "...", "..." ]
 		}
 
-		Kaждый заголовок ("chapter") должен быть 5-7 слов.
+		Kaждый заголовок должен быть 5-7 слов.
 		Рассказ должен получиться захватывающим благодаря твоей точности передачи смысла через заголовки!
 		Спасибо.
 	'''
 
 	interpreter = 'llm'
-	config = {
+	config      = {
 		'model_id'    : 'ollama::gemma3:4b',
 		'temperature' : 0.7
 	}
 
+################################################################
+
+class Main(Operator):
+
+	class InputType(BaseModel):
+		topic  : str
+		depth  : int
+		spread : int
+
+	class OutputType(BaseModel):
+		text: str
+
+	async def invoke(self, topic, depth, spread):
+		idea = await idea(topic)
+		print('IDEA:', idea)
+		planner_input = {
+			'topic' : topic,
+			'idea'  : idea,
+			'item'  : topic
+		}
+		result = await recursor(
+			generator_name  = 'planner',
+			generator_input = planner_input,
+			depth           = depth,
+			spread          = spread
+		)
+		return result
 
 ################################################################
+
 class Process:
-	entry = main
+	entry = Main

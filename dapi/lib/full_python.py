@@ -119,12 +119,11 @@ class FullPython(Python):
 
 			# parameters are ready
 			parameters = dict(self.input)
-
+			print(self.operator_name, parameters)
 			#----------------------------------
 			result = await invoke_method(**parameters)
 			#----------------------------------
 			# print(self.i, f'{self.operator_class_name}.invoke result', result)
 			return result
-
 		finally:
 			self.execution_context.pop()

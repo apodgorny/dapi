@@ -39,9 +39,14 @@ class Recursor(Operator):
 
 			if depth > 1:
 				for item in call_result:
+					new_generator_input = {
+						**generator_input,     # сохраняем все старые ключи
+						'item'        : item,  # обновляем только item
+						'breadcrumbs' : breadcrumbs
+					}
 					result_item = await recursor(
 						generator_name  = generator_name,
-						generator_input = { 'item' : item, 'breadcrumbs': breadcrumbs },
+						generator_input = new_generator_input,
 						depth           = depth-1,
 						spread          = spread,
 						breadcrumbs     = breadcrumbs

@@ -203,7 +203,9 @@ class OperatorService(DapiService):
 			if param in provided:
 				parameters[param] = provided[param]
 			elif param in required_fields:
-				raise ValueError(f'[OperatorService] Operator `{operator_name}` is missing required parameter: `{param}`')
+				provided_keys = list(provided.keys())
+				provided_keys = ', '.join([f'`{k}`' for k in provided_keys])
+				raise ValueError(f'[OperatorService] Operator `{operator_name}` is missing required parameter: `{param}`, keys provided: {provided_keys}')
 
 		return parameters
 
@@ -247,8 +249,6 @@ class OperatorService(DapiService):
 			return output_dict[expected_fields[0]]
 
 		return tuple(output_dict[field] for field in expected_fields)
-
-
 
 	async def call_external_operator(self, name: str, args: list, kwargs: dict, context: ExecutionContext, de: str = None) -> Any:
 		'''
