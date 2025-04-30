@@ -1,14 +1,19 @@
-import os
+import os, re
+
 from pydantic import BaseModel
 
-from dapi.lib import Module, Datum
+from .module         import Module
+from .datum          import Datum
+from .string         import String
+from .dapi_exception import DapiException
 
 
 class Model:
-	'''Base class for LLM and runtime models.'''
 
 	def __init__(self, name: str):
 		self.name = name
+
+	##################################################################
 
 	def to_json_schema(self, schema: any) -> dict:
 		if isinstance(schema, Datum):		                            return schema.to_schema()
@@ -16,12 +21,21 @@ class Model:
 		if isinstance(schema, dict):		                            return schema
 		raise ValueError(f'Unsupported schema type: {type(schema).__name__}')
 
+	##################################################################
+
+	@staticmethod
+	def fill_prompt(template: str, input_data: dict) -> str:
+		template = String.unindent(template)
+		matches  = set(re.findall(r'\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}', template))
+
+		for path in matches:
+			if path not in input_data:
+				raise ValueError(f'[LLM] Field `{path}` mentioned in prompt, but not supplied')
+			template = template.replace(f'{{{{{path}}}}}', str(input_data[path]))
+		return template
+
 	@classmethod
 	def load(cls, model_id: str) -> 'Model':
-		'''
-		Load model by `provider::name` syntax from external module file.
-		'''
-
 		if '::' not in model_id:
 			raise ValueError(f'Invalid model_id: `{model_id}`. Expected format `provider::name`')
 
@@ -42,3 +56,39 @@ class Model:
 
 		except AttributeError:
 			raise ValueError(f'No subclass of Model found in `{file_path}`')
+
+	@classmethod
+	async def generate(
+		cls,
+		prompt          : str,
+		input           : dict,
+		response_schema : BaseModel,
+
+		model_id        : str        = 'ollama::gemma3:4b',
+		role            : str        = 'user',
+		temperature     : float      = 0.0,
+		system          : str | None = None
+
+	) -> dict:
+		try:
+			prompt          = Model.fill_prompt(prompt, input)
+			model           = Model.load(model_id)
+			# response_schema = response_schema.model_json_schema()
+
+			result = await model(
+				prompt          = prompt,
+				response_schema = response_schema,
+				role            = role,
+				temperature     = temperature,
+				system          = system
+			)
+
+			# Convert to tuple to match minipython and fullpython
+			result = tuple(result[k] for k in result)
+			if len(result) == 1:
+				result = result[0]
+
+			return result
+
+		except Exception as e:
+			raise DapiException.consume(e)

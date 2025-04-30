@@ -50,9 +50,9 @@ class ModelOllama(Model):
 
 		response  = await asyncio.to_thread(self.client.chat, **params)
 		text      = response['message']['content']
-		print('-' * 30)
-		print('OUTPUT', text)
-		print('-' * 30)
+		# print('-' * 30)
+		# print('OUTPUT', text)
+		# print('-' * 30)
 		sanitized = self._sanitize_output(text)
 
 		return json.loads(sanitized)

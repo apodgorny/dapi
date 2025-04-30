@@ -1,17 +1,29 @@
-from dapi.lib import Datum, Operator
+import os, sys
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-class main(Operator):
-	class InputType(Datum.Pydantic):
+from pydantic import BaseModel
+from typing   import List, Dict, Any, Optional
+
+from wordwield.wordwield import Operator, WordWield as ww
+
+################################################################
+
+class Main(Operator):
+	class InputType(BaseModel):
 		operator : str
 		message  : str
 
-	class OutputType(Datum.Pydantic):
+	class OutputType(BaseModel):
 		call_result : dict
 
 	async def invoke(self, operator, message):
-		result = await call(operator, {'text' : message })
-		return result
+		return await call(operator, message)
 
-class Process:
-	entry = main
+################################################################
+
+ww.init()
+ww.invoke('main', {
+	'operator' : 'log',
+	'message'  : 'hellooow'
+})

@@ -145,14 +145,13 @@ class Client:
 				exit(1)
 
 	@staticmethod
-	def create_operator(name, class_name, input_type, output_type, code, interpreter, description, config=None):
+	def create_operator(name, class_name, input_type, output_type, code, description, config=None):
 		data = {
 			'name'        : name,
 			'class_name'  : class_name,
 			'input_type'  : input_type,
 			'output_type' : output_type,
 			'code'        : code,
-			'interpreter' : interpreter,
 			'description' : description
 		}
 		if config is not None:

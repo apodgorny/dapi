@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import os, ast, re
 import uuid
 import inspect
 
@@ -17,14 +17,9 @@ from dapi.lib        import (
 	ExecutionContext,
 	Operator,
 	Module,
+	Python,
 	is_reserved
 )
-from dapi.interpreters import (
-	LLMInterpreter,
-	MiniPythonInterpreter,
-	FullPythonInterpreter
-)
-
 
 OPERATOR_DIR = os.path.join(
 	os.environ.get('PROJECT_PATH'),
@@ -69,11 +64,26 @@ class OperatorService(DapiService):
 
 	############################################################################
 
+	def _generate_proxy_operator(self, code: str) -> str:
+		tree       = ast.parse(code)
+		cls        = next(n for n in tree.body if isinstance(n, ast.ClassDef))
+		method     = next(n for n in cls.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'invoke')
+		args       = [a.arg for a in method.args.args if a.arg != 'self']
+		arglist    = ', '.join(args)
+		snake_name = String.to_snake_case(cls.name)
+
+		return (
+			f'class {cls.name}Proxy(Operator):\n'
+			f'\tasync def invoke(self, {arglist}):\n'
+			f'\t\treturn await {snake_name}({arglist})'
+		)
+
+
 	async def _register_plugin_operators(self):
 		await self.delete_all()
 		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
 
-		print(String.underlined('\nFull python operators:'))
+		print(String.underlined('\nUnrestricted operators:'))
 		for name, operator_class in classes.items():
 			if not hasattr(operator_class, 'invoke'):
 				continue
@@ -89,7 +99,7 @@ class OperatorService(DapiService):
 				schema = OperatorSchema(
 					name         = name,
 					class_name   = operator_class.__name__,
-					interpreter  = 'full',
+					restrict     = False,
 					input_type   = operator_class.InputType.model_json_schema(),
 					output_type  = operator_class.OutputType.model_json_schema(),
 					code         = code,
@@ -129,14 +139,6 @@ class OperatorService(DapiService):
 		operator.config = operator.config if operator.config else {}
 		return operator
 
-	async def validate_interpreter(self, interpreter):
-		if not await self.dapi.interpreter_service.has(interpreter):
-			raise DapiException(
-				status_code = 404,
-				detail      = f'Interpreter `{interpreter}` does not exist',
-				severity    = DapiException.HALT
-			)
-
 	def get_execution_context(self):
 		return self._last_context
 
@@ -151,6 +153,9 @@ class OperatorService(DapiService):
 			exec(operator.code, globals_dict)
 
 			operator_class = globals_dict[class_name]
+			if not operator_class:
+				return None
+
 			self._operator_classes[operator_name] = operator_class
 
 		return operator_class
@@ -166,7 +171,8 @@ class OperatorService(DapiService):
 			if self.exists(schema.name) and replace:
 				await self.delete(schema.name)
 
-			await self.validate_interpreter(schema.interpreter)
+			# schema.model_dump(exclude_unset=True))
+
 			record = OperatorRecord(**schema.model_dump())
 			self.dapi.db.add(record)
 			self.dapi.db.commit()
@@ -191,16 +197,11 @@ class OperatorService(DapiService):
 		self.dapi.db.delete(record)
 		self.dapi.db.commit()
 
-	async def delete_all(self, which=None) -> None:
-		'''Delete all operators from the database.'''
-		which = ['mini', 'llm', 'full'] if not isinstance(which, list) else which
-		records = (
-			self.dapi.db.query(OperatorRecord)
-				.filter(OperatorRecord.interpreter.in_(which))
-				.all()
-		)
-		for record in records:
-			self.dapi.db.delete(record)
+	async def delete_all(self) -> None:
+		'''Delete all restricted operators.'''
+		self.dapi.db.query(OperatorRecord)             \
+			.filter(OperatorRecord.restrict.is_(True)) \
+			.delete(synchronize_session=False)
 		self.dapi.db.commit()
 
 	async def get_input_dict(self, operator_name: str, args: list[Any], kwargs: dict[str, Any]) -> dict:
@@ -281,7 +282,7 @@ class OperatorService(DapiService):
 
 		return tuple(output_dict[field] for field in expected_fields)
 
-	async def call_external_operator(self, name: str, args: list, kwargs: dict, context: ExecutionContext, de: str = None) -> Any:
+	async def call_external_operator(self, name: str, args: list, kwargs: dict, context: ExecutionContext) -> Any:
 		'''
 		Handles external operator call by packing input from local variables,
 		invoking the operator, and unpacking the output for use.
@@ -297,42 +298,45 @@ class OperatorService(DapiService):
 			raise ValueError('ExecutionContext must be explicitly provided')
 		
 		self._last_context = context
-		self.i            = context.i
+		self.i             = context.i
 
 		operator = self.require(name)
+		code     = operator.code
 		output   = ''
 
-		if operator.interpreter == 'llm':
-			operator.config['output_schema'] = operator.output_type
+		# print('-' * 30)
+		# print('CODE of', operator.name)
+		# print('-' * 30)
+		# print(code)
+		# print('-' * 30)
 
 		try:
 			context.push(
 				name        = name,
 				lineno      = 1,
-				interpreter = operator.interpreter,
+				restrict    = operator.restrict,
 				importance  = 1,
 				detail      = str(input)
 			)
-			if interpreter := self.dapi.interpreter_service.get(operator.interpreter):
-				interpreter_instance = interpreter (
-					operator_name          = name,
-					operator_class_name    = operator.class_name,
-					operator_code          = operator.code,
-					operator_input         = input,
-					execution_context      = context,
-					operator_globals       = self._operator_globals,           
-					call_external_operator = self.call_external_operator,
-					get_operator_class     = self.get_operator_class,
-					config                 = operator.config
-				)
-				result = await interpreter_instance.invoke()
-				output = await self.get_output_dict(name, result)  # Pack output (wrap value/tuple into output dict)
-				return output
 
-			raise DapiException(
-					status_code = 400,
-					detail      = f'Unknown interpreter: `{operator.interpreter}`',
-					severity    = DapiException.HALT
-				)
+			instance = Python(
+				operator_name          = name,
+				operator_class_name    = operator.class_name,
+				input_dict             = input,
+				code                   = code,
+				execution_context      = context,
+				operator_globals       = self._operator_globals,
+				call_external_operator = self.call_external_operator,
+				get_operator_class     = self.get_operator_class,
+				restrict               = operator.restrict
+			)
+
+			result = await instance.invoke()
+			output = await self.get_output_dict(name, result)
+			return output
+
+		except Exception as e:
+			raise DapiException.consume(e)
+
 		finally:
 			context.pop(detail=str(output))

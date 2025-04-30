@@ -1,15 +1,9 @@
-import os, ast, inspect
+import os, ast
 from pathlib import Path
 
 from pydantic        import BaseModel
 from dapi.lib        import String
 from dapi.lib.module import Module
-
-
-class Operator:
-	interpreter = 'mini'
-	def invoke(input):
-		pass
 
 
 class Code:
@@ -23,22 +17,10 @@ class Code:
 
 	@staticmethod
 	def _get_code(operator, node: ast.ClassDef, lines: list[str]) -> str:
-		# if Code._get_interpreter(operator) == 'llm':
-		# 	return String.unindent(operator.code).strip()
-		# else:
-		'''Return source of class node, unindented, without using inspect.'''
 		start = node.lineno - 1
 		end   = node.end_lineno
 		src   = '\n'.join(lines[start:end])
 		return String.unindent(src)
-
-	@staticmethod
-	def _get_interpreter(operator):
-		if hasattr(operator, 'interpreter'):
-			return operator.interpreter
-		if not hasattr(operator, 'invoke'):
-			return 'llm'
-		return 'mini'
 
 	@staticmethod
 	def serialize(path: str) -> dict:
@@ -67,8 +49,7 @@ class Code:
 					'input_type'  : input_type.model_json_schema(),
 					'output_type' : output_type.model_json_schema(),
 					'code'        : Code._get_code(operator, node, lines),
-					'interpreter' : Code._get_interpreter(operator),
-					'description' : 'Foobar',
+					'description' : getattr(operator, '__doc__', '') or '',
 					'config'      : {}
 				}
 
@@ -78,4 +59,3 @@ class Code:
 			'operators'  : operators,
 			'entry_name' : entry_name
 		}
-

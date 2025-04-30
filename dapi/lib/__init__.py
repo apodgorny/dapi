@@ -3,10 +3,7 @@ from .python            import Python
 from .string            import String
 from .datum             import Datum, DatumSchemaError, DatumError
 from .code              import Code
-from .mini_python       import MiniPython
-from .full_python       import FullPython
 from .module            import Module
-from .interpreter       import Interpreter
 from .operator          import Operator
 from .struct            import Struct
 from .model             import Model

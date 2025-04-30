@@ -16,26 +16,31 @@ class Operator:
 
 
 class WordWield:
+	VERBOSE = True
+
 	####################################################################################
 
 	@staticmethod
-	def serialize_operator_class(operator_class):
-		'''Serializes a single Python class to operator definition.'''
-		try:
-			code = String.unindent(inspect.getsource(operator_class))
-		except TypeError as e:
-			raise ValueError(f'Cannot get source code of `{operator_class.__name__}`. Ensure it is imported normally.') from e
+	def print(*args, **kwargs):
+		kwargs['flush'] = True
+		color = kwargs.pop('color', None)
+		if color:
+			args = [String.color(arg, color) for arg in args]
+		print(*args, **kwargs)
 
-		return {
-			'name'        : String.to_snake_case(operator_class.__name__),
-			'class_name'  : operator_class.__name__,
-			'input_type'  : Datum(operator_class.InputType).to_dict(schema=True),
-			'output_type' : Datum(operator_class.OutputType).to_dict(schema=True),
-			'code'        : code,
-			'interpreter' : getattr(operator_class, 'interpreter', 'full'),
-			'description' : inspect.getdoc(operator_class) or '',
-			'config'      : getattr(operator_class, 'config', {})
-		}
+	@staticmethod
+	def success(message):
+		if WordWield.VERBOSE:
+			prefix = String.color('SUCCESS:', String.LIGHTGREEN)
+			WordWield.print(f'{prefix} {message}')
+
+	@staticmethod
+	def error(severity, message):
+		if not WordWield.VERBOSE:
+			return
+		prefix = String.color(severity.upper() + ':', WordWield._color(severity))
+		message = str(message).replace('\\n', '\n')
+		WordWield.print(f'{prefix} {message}')
 
 	@staticmethod
 	def _color(severity):
@@ -87,24 +92,64 @@ class WordWield:
 	####################################################################################
 
 	@staticmethod
+	def serialize_operator_class(operator_class):
+		'''Serializes a single Python class to operator definition.'''
+		try:
+			code = String.unindent(inspect.getsource(operator_class))
+		except TypeError as e:
+			raise ValueError(f'Cannot get source code of `{operator_class.__name__}`. Ensure it is imported normally.') from e
+
+		return {
+			'name'        : String.to_snake_case(operator_class.__name__),
+			'class_name'  : operator_class.__name__,
+			'input_type'  : Datum(operator_class.InputType).to_dict(schema=True),
+			'output_type' : Datum(operator_class.OutputType).to_dict(schema=True),
+			'code'        : code,
+			'description' : inspect.getdoc(operator_class) or '',
+			'config'      : getattr(operator_class, 'config', {})
+		}
+
+	@staticmethod
 	def request(method: str, path: str, **kwargs):
 		url = f'{DAPI_URL}/{path.lstrip("/")}'
 		kwargs.setdefault('timeout', 1200.0)
+
+		if WordWield.VERBOSE:
+			bar = f'  {"- " * 22}'
+			WordWield.print('\n' + ('-' * 45))
+			WordWield.print(String.underlined(f'Calling `{path}`'))
+			if 'json' in kwargs:
+				WordWield.print(f'\n{bar}', color=String.DARK_GRAY)
+				for key, val in kwargs['json'].items():
+					WordWield.print(f'  {key:<16}{String.color(":", String.GRAY)} ', end='')
+					if isinstance(val, dict):
+						val = json.dumps(val, indent=2, ensure_ascii=False)
+						val = Highlight.python(val)
+						WordWield.print()
+						for line in val.splitlines():
+							WordWield.print(f'    {line}')
+					else:
+						val = Highlight.python(str(val))
+						WordWield.print(val)
+				WordWield.print(bar, color=String.DARK_GRAY)
+
 		try:
 			res = httpx.request(method, url, **kwargs)
 			res.raise_for_status()
 			return res.json()
-		except httpx.ConnectError as e:
-			raise ConnectionError(f'Failed to connect to DAPI server: {e}')
 		except httpx.HTTPStatusError as e:
 			severity, message, trace = WordWield._extract_dapi_error(e.response)
-			raise RuntimeError(f'{severity.upper()}: {message}\n{trace or ""}')
-
-	####################################################################################
+			WordWield.error(severity, message)
+			if trace:
+				WordWield.print(String.color(trace, String.GRAY))
+			if severity == 'halt':
+				exit(1)
+		except Exception as e:
+			WordWield.error('halt', str(e))
+			exit(1)
 
 	@staticmethod
 	def create_operator(operator_class):
-		'''Create and register an operator from a local Python class.'''
 		source = WordWield.serialize_operator_class(operator_class)
 		data = {
 			'name'        : source['name'],
@@ -112,18 +157,37 @@ class WordWield:
 			'input_type'  : source['input_type'],
 			'output_type' : source['output_type'],
 			'code'        : source['code'],
-			'interpreter' : source['interpreter'],
 			'description' : source.get('description', '')
 		}
 		if 'config' in source:
 			data['config'] = source['config']
 
-		return WordWield.request('POST', '/create_operator', json=data)
+		res = WordWield.request('POST', '/create_operator', json=data)
+		WordWield.success(f'Operator `{data["name"]}` created')
+		return res
+
+	@staticmethod
+	def init():
+		'''Create all Operator subclasses defined in the caller scope.'''
+		# 1. Получить frame, в котором вызван init()
+		frame = inspect.currentframe().f_back
+		locals_dict = frame.f_locals
+
+		# 2. Пройтись по всем локальным классам
+		for name, obj in locals_dict.items():
+			if (
+				inspect.isclass(obj)
+				and issubclass(obj, Operator)
+				and obj is not Operator
+			):
+				WordWield.create_operator(obj)
 
 	@staticmethod
 	def invoke(name: str, input_data: dict):
-		'''Invoke an existing operator by name.'''
-		return WordWield.request('POST', f'{name}', json=input_data)
+		res = WordWield.request('POST', f'{name}', json=input_data)
+		WordWield.success(f'Invoked operator `{name}`:\n')
+		WordWield.print(Highlight.python(json.dumps(res, ensure_ascii=False, indent=4)))
+		return res
 
 
 # Alias for easy import

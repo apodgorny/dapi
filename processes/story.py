@@ -148,7 +148,7 @@ def main():
 
 	# Вызов Story
 	story = ww.invoke('story', {
-		'topic'  : 'Яйцо',
+		'topic'  : 'Ромашка',
 		'depth'  : 3,
 		'spread' : 3
 	})

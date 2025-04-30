@@ -1,5 +1,5 @@
 from dapi.lib       import Dapi, ExecutionContext
-from dapi.services  import OperatorService, InterpreterService
+from dapi.services  import OperatorService
 from dapi.schemas   import (
 	NameSchema,
 	EmptySchema,
@@ -11,8 +11,7 @@ from dapi.schemas   import (
 )
 
 dapi = Dapi(
-	OperatorService,
-	InterpreterService
+	OperatorService
 )
 
 # OPERATOR endpoints
@@ -20,7 +19,7 @@ dapi = Dapi(
 
 @dapi.router.post('/create_operator', response_model=OperatorSchema)
 async def create_operator(input: OperatorSchema):
-	name = await dapi.operator_service.create(input)
+	name = await dapi.operator_service.create(input, replace=True)
 	return await dapi.operator_service.get(name)
 
 @dapi.router.post('/get_operator', response_model=OperatorSchema)
@@ -37,18 +36,12 @@ async def delete_operator(input: NameSchema):
 	await dapi.operator_service.delete(input.name)
 	return {'status': 'success'}
 
-# @dapi.router.post('/invoke_operator', response_model=OutputSchema)
-# async def invoke_operator(input: OperatorInputSchema):
-# 	context = ExecutionContext(root=input.name)
-# 	result  = await dapi.operator_service.invoke(input.name, input.input, context)
-# 	return OutputSchema(output=result if isinstance(result, dict) else {})
-
 @dapi.router.post('/reset', response_model=StatusSchema)
 async def reset_operators(input: EmptySchema):
-	await dapi.operator_service.delete_all(['llm', 'mini'])
+	await dapi.operator_service.delete_all()
 	return { 'status' : 'success' }
 
-# DYNAMIC fallback
+# DYNAMIC invoke
 ############################################################################
 
 @dapi.router.post('/{operator_name}', include_in_schema=False)
