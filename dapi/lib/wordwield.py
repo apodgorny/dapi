@@ -183,11 +183,18 @@ class WordWield:
 				WordWield.create_operator(obj)
 
 	@staticmethod
-	def invoke(name: str, input_data: dict):
+	def invoke(name: str, *args, **kwargs):
+		# Если передан один словарь как позиционный аргумент — это input_data
+		if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
+			input_data = args[0]
+		else:
+			input_data = kwargs
+
 		res = WordWield.request('POST', f'{name}', json=input_data)
 		WordWield.success(f'Invoked operator `{name}`:\n')
 		WordWield.print(Highlight.python(json.dumps(res, ensure_ascii=False, indent=4)))
 		return res
+
 
 
 # Alias for easy import

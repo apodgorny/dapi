@@ -1,18 +1,24 @@
-from dapi.lib import Datum, Operator
-from typing   import Any
+import os, sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from pydantic import BaseModel
+from typing   import List, Dict, Any
+
+from wordwield.wordwield import Operator, WordWield as ww
+
+################################################################
 
 class TaskSplitter(Operator):
-	'''Splits a given task description into a dynamic number of subtasks.'''
-
-	class InputType(Datum.Pydantic):
+	class InputType(BaseModel):
 		spread      : int
 		item        : str
 		breadcrumbs : list[str]
 
-	class OutputType(Datum.Pydantic):
-		items      : list[str]
+	class OutputType(BaseModel):
+		items: List[str]
 
-	code = '''
+	prompt = '''
 		You are assisting a user in breaking down tasks into smaller actionable steps.
 
 		User has narrowed down his task to {{breadcrumbs}}.
@@ -27,35 +33,34 @@ class TaskSplitter(Operator):
 		- Return the result as a list of exactly {{spread}} subtask texts.
 	'''
 
-	interpreter = 'llm'
-	config = {
-		'model_id'    : 'ollama::gemma3:4b',
-		'temperature' : 0.2,
-	}
+	async def invoke(self, **input):
+		return await self.ask(**input)
 
 ################################################################
 
 class Main(Operator):
-	'''Entry point that launches recursive task generation.'''
-
-	class InputType(Datum.Pydantic):
+	class InputType(BaseModel):
 		task   : str
 		depth  : int
 		spread : int
 
-	class OutputType(Datum.Pydantic):
-		result: dict[str, Any]
+	class OutputType(BaseModel):
+		result: Dict[str, Any]
 
-	async def invoke(self, task: str, depth: int, spread: int):
-		result = await recursor(
+	async def invoke(self, task, depth, spread):
+		return await call(
+			'branch_recursion',
 			generator_name  = 'task_splitter',
 			generator_input = { 'item': task },
 			depth           = depth,
 			spread          = spread
 		)
-		return result
 
 ################################################################
 
-class Process:
-	entry = Main
+ww.init()
+ww.invoke('main',
+	task   = 'Write a book on AI philosophy',
+	depth  = 2,
+	spread = 3
+)

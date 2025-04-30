@@ -26,7 +26,6 @@ class Python:
 		execution_context      : Optional[ExecutionContext],
 		operator_globals       : dict,
 		call_external_operator : Callable[[str, dict, ExecutionContext], Awaitable[Any]],
-		get_operator_class     : Callable[[str], type],
 		restrict               : bool = True
 	):
 		self.operator_name          = operator_name
@@ -34,7 +33,6 @@ class Python:
 		self.input                  = input_dict
 		self.code                   = code
 		self.call_external_operator = call_external_operator
-		self.get_operator_class     = get_operator_class
 		self.execution_context      = execution_context
 		self.globals                = { **operator_globals }
 		self.i                      = execution_context.i
@@ -54,20 +52,6 @@ class Python:
 			compiled = compile(self.code, filename='<python>', mode='exec')
 
 		self.globals['_wrap_call_async'] = self._wrap_call_async
-
-		async def call_wrapper(name, *args, **kwargs):
-			if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
-				kwargs = args[0]
-				args   = []
-
-			return await self.call_external_operator(
-				name     = name,
-				args     = list(args),
-				kwargs   = kwargs,
-				context  = self.execution_context
-			)
-
-		self.globals['call'] = call_wrapper
 		exec(compiled, self.globals)
 
 	############################################################################
@@ -98,12 +82,15 @@ class Python:
 		tree = ast.parse(code_str, filename='<python>')
 
 		class CallRewriter(ast.NodeTransformer):
+			def __init__(self, allowed_names: set[str]):
+				super().__init__()
+				self.allowed_names = allowed_names
+
 			def visit_Call(self, node: ast.Call) -> ast.AST:
 				self.generic_visit(node)
 				if isinstance(node.func, ast.Name):
-					# Handle special funciton "call"
-					if node.func.id == 'call':
-						return node
+					if node.func.id in self.allowed_names:
+						return node # skip rewriting known globals like call, ask, print
 
 					return ast.copy_location(ast.Call(
 						func = ast.Name(id='_wrap_call_async', ctx=ast.Load()),
@@ -120,7 +107,9 @@ class Python:
 					), node)
 				return node
 
-		tree = CallRewriter().visit(tree)
+		allowed_names = set(self.globals.keys())
+		tree = CallRewriter(allowed_names).visit(tree)
+
 		ast.fix_missing_locations(tree)
 		return compile(tree, filename='<python>', mode='exec')
 
@@ -153,11 +142,7 @@ class Python:
 			if not operator_class:
 				raise ValueError(f'Class `{self.operator_class_name}` not found')
 
-			instance = operator_class(
-				self.call_external_operator,
-				self.get_operator_class,
-				print
-			)
+			instance = operator_class(self.globals)
 			invoke_method = getattr(instance, 'invoke', None)
 			if not invoke_method:
 				raise ValueError(f'Method `invoke` not found in `{self.operator_class_name}`')

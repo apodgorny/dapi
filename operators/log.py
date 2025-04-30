@@ -12,5 +12,5 @@ class Log(Operator):
 		text : str
 
 	async def invoke(self, text):
-		self.print('From operator:', text, flush=True)
+		print('From operator:', text, flush=True)
 		return 'From operator:' + text

@@ -34,13 +34,7 @@ class OllamaAddOne(Operator):
 	'''
 
 	async def invoke(self, x):
-		return await ask(
-			input           = { 'x': x },
-			prompt          = self.prompt,
-			response_schema = self.output_type
-		)
-		return {}
-
+		return await self.ask(x = x)
 
 ################################################################
 
@@ -53,6 +47,7 @@ class DoubleThenSquare(Operator):
 
 	async def invoke(self, x):
 		# exec('x = 2')
+		print('%'*10)
 		x = await times_two(x)       # Full Python
 		x = await square(x)          # Mini Python
 		x = await ollama_add_one(x)  # LLM
@@ -61,7 +56,7 @@ class DoubleThenSquare(Operator):
 ################################################################
 
 ww.init()
-ww.invoke('double_then_square', {
-	'x' : 3
-})
+ww.invoke('times_two',
+	x = 3
+)
 

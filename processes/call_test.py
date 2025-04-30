@@ -23,7 +23,7 @@ class Main(Operator):
 ################################################################
 
 ww.init()
-ww.invoke('main', {
-	'operator' : 'log',
-	'message'  : 'hellooow'
-})
+ww.invoke('main', 
+	operator = 'log',
+	message  = 'haha'
+)

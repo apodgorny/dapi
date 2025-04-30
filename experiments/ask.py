@@ -18,9 +18,7 @@ class Ask(Operator):
 	class OutputType(BaseModel):
 		result : dict
 
-	async def invoke(
-		self,
-
+	async def invoke(self,
 		input,
 		prompt,
 		response_schema,

@@ -4,6 +4,8 @@ import os, ast, re
 import uuid
 import inspect
 
+from typing          import Dict, List, Any
+
 from pydantic        import BaseModel
 
 from dapi.db         import OperatorRecord
@@ -17,6 +19,7 @@ from dapi.lib        import (
 	ExecutionContext,
 	Operator,
 	Module,
+	Model,
 	Python,
 	is_reserved
 )
@@ -32,13 +35,18 @@ class OperatorService(DapiService):
 	'''Service for managing operators.'''
 
 	def __init__(self, dapi):
-		self.dapi = dapi
-		self.i    = ''
-
-		self._last_context     = None
+		self.dapi              = dapi
+		self.i                 = ''
 		self._operator_classes = {}  # name → operator class
 
-		self._operator_globals = globals_dict = {
+	async def initialize(self):
+		await super().initialize()
+		await self._register_plugin_operators()
+
+	############################################################################
+
+	def _get_operator_globals(self, context):
+		operator_globals = {
 			'Operator'   : Operator,
 			'Datum'      : Datum,
 			'BaseModel'  : BaseModel,
@@ -54,15 +62,47 @@ class OperatorService(DapiService):
 			'float'      : float,
 			'bool'       : bool,
 			'set'        : set,
-			'tuple'      : tuple
+			'tuple'      : tuple,
+
+			'Dict'       : Dict,
+			'List'       : List,
+			'Any'        : Any
 		}
 
+		#-----------------------------------------------------------------#
+		async def _call(name, *args, **kwargs):
+			if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
+				kwargs = args[0]
+				args   = []
 
-	async def initialize(self):
-		await super().initialize()
-		await self._register_plugin_operators()
+			return await self.call_external_operator(
+				name     = name,
+				args     = list(args),
+				kwargs   = kwargs,
+				context  = context
+			)
 
-	############################################################################
+		operator_globals['call'] = _call
+		#-----------------------------------------------------------------#
+		async def _ask(
+			input,
+			prompt,
+			response_schema,
+
+			model_id    = 'ollama::gemma3:4b',
+			temperature = 0.0
+		):
+			return await Model.generate(
+				prompt          = prompt,
+				input           = input,
+				response_schema = response_schema,
+				model_id        = model_id,
+				temperature     = temperature
+			)
+
+		operator_globals['ask'] = _ask
+		#-----------------------------------------------------------------#
+		return operator_globals
 
 	def _generate_proxy_operator(self, code: str) -> str:
 		tree       = ast.parse(code)
@@ -138,27 +178,6 @@ class OperatorService(DapiService):
 			)
 		operator.config = operator.config if operator.config else {}
 		return operator
-
-	def get_execution_context(self):
-		return self._last_context
-
-	async def get_operator_class(self, operator_name: str):
-		class_name     = String.snake_to_camel(operator_name)
-		operator_class = self._operator_classes.get(class_name, None)
-
-		if not operator_class:
-			operator = self.require(operator_name)
-
-			globals_dict = { **self._operator_globals }
-			exec(operator.code, globals_dict)
-
-			operator_class = globals_dict[class_name]
-			if not operator_class:
-				return None
-
-			self._operator_classes[operator_name] = operator_class
-
-		return operator_class
 
 	############################################################################
 
@@ -297,18 +316,11 @@ class OperatorService(DapiService):
 		if context is None:
 			raise ValueError('ExecutionContext must be explicitly provided')
 		
-		self._last_context = context
-		self.i             = context.i
+		self.i = context.i
 
-		operator = self.require(name)
-		code     = operator.code
-		output   = ''
-
-		# print('-' * 30)
-		# print('CODE of', operator.name)
-		# print('-' * 30)
-		# print(code)
-		# print('-' * 30)
+		operator         = self.require(name)
+		operator_globals = self._get_operator_globals(context)
+		output           = ''
 
 		try:
 			context.push(
@@ -323,11 +335,10 @@ class OperatorService(DapiService):
 				operator_name          = name,
 				operator_class_name    = operator.class_name,
 				input_dict             = input,
-				code                   = code,
+				code                   = operator.code,
 				execution_context      = context,
-				operator_globals       = self._operator_globals,
+				operator_globals       = operator_globals,
 				call_external_operator = self.call_external_operator,
-				get_operator_class     = self.get_operator_class,
 				restrict               = operator.restrict
 			)
 
