@@ -31,7 +31,7 @@ class Recursor(Operator):
 			'out' : []
 		}
 		if depth > 0:
-			self.print(breadcrumbs)
+			print(breadcrumbs)
 			generator_input = { **generator_input, 'spread': spread, 'breadcrumbs' : breadcrumbs }
 			call_result     = await call(generator_name, generator_input)
 

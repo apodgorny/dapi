@@ -118,7 +118,6 @@ class OperatorService(DapiService):
 			f'\t\treturn await {snake_name}({arglist})'
 		)
 
-
 	async def _register_plugin_operators(self):
 		await self.delete_all()
 		classes = Module.load_package_classes(Operator, OPERATOR_DIR)
@@ -233,30 +232,82 @@ class OperatorService(DapiService):
 		expected_fields = list(input_schema.get('properties', {}).keys())
 		required_fields = input_schema.get('required', [])
 
+		# Utility to build detailed error context, phrased from operator's perspective
+		def make_detail(message: str, error_type: str, extra: dict = {}) -> dict:
+			return {
+				'message'    : message,
+				'error_type' : error_type,
+				'operator'   : operator_name,
+				'args'       : args,
+				'kwargs'     : kwargs,
+				'declared_input_fields': expected_fields,
+				**extra
+			}
+
 		provided = {}
 
-		# 1. Map positional args
+		# 1. Map positional args to declared fields in InputType
 		for param, value in zip(expected_fields, args):
 			provided[param] = value
 
-		# 2. Fill missing from kwargs
+		# 2. Fill remaining fields from keyword args
 		for param in expected_fields:
 			if param not in provided and param in kwargs:
 				provided[param] = kwargs[param]
 
-		# 3. Handle 'self'
+		# 3. Auto-inject self if present in schema
 		if 'self' in expected_fields and 'self' not in provided:
 			provided['self'] = None
 
-		# 4. Validate required fields only
+		# 4. Fail if operator was defined with too few input fields
+		if len(args) > len(expected_fields):
+			raise DapiException(
+				status_code = 422,
+				detail      = make_detail(
+					message    = (
+						f'Operator `{operator_name}` declares only {len(expected_fields)} input field'
+						f'{"s" if len(expected_fields) != 1 else ""}, but received {len(args)} positional argument'
+						f'{"s" if len(args) != 1 else ""}.'
+					),
+					error_type = 'TooManyArgs'
+				),
+				severity = DapiException.HALT
+			)
+
+		# 5. Fail if keyword arguments are passed that are not defined in operator's InputType
+		unexpected_keys = set(kwargs.keys()) - set(expected_fields)
+		if unexpected_keys:
+			raise DapiException(
+				status_code = 422,
+				detail      = make_detail(
+					message    = (
+						f'Operator `{operator_name}` does not declare fields: {", ".join(unexpected_keys)} '
+						f'in its InputType, but they were passed as input.'
+					),
+					error_type = 'UnexpectedKwargs',
+					extra      = { 'unexpected': list(unexpected_keys) }
+				),
+				severity = DapiException.HALT
+			)
+
+		# 6. Validate that all required parameters are present
 		parameters = {}
 		for param in expected_fields:
 			if param in provided:
 				parameters[param] = provided[param]
 			elif param in required_fields:
-				provided_keys = list(provided.keys())
-				provided_keys = ', '.join([f'`{k}`' for k in provided_keys])
-				raise ValueError(f'[OperatorService] Operator `{operator_name}` is missing required parameter: `{param}`, keys provided: {provided_keys}')
+				raise DapiException(
+					status_code = 422,
+					detail      = make_detail(
+						message    = (
+							f'Operator `{operator_name}` requires parameter `{param}` '
+							f'in its InputType, but it was not provided.'
+						),
+						error_type = 'MissingRequired',
+						extra      = { 'missing': param, 'provided': list(provided.keys()) }
+					),
+					severity = DapiException.HALT
+				)
 
 		return parameters
 
@@ -265,27 +316,66 @@ class OperatorService(DapiService):
 		Wraps a raw operator output (single value or tuple) into a validated dict
 		according to the operator's OutputType schema.
 		'''
-		# Retrieve operator metadata
 		record          = await self.get(operator_name)
 		expected_fields = list(record['output_type'].get('properties', {}).keys())
 
-		if not expected_fields:
-			raise ValueError(f'[OperatorService] Operator `{operator_name}` has no output fields defined.')
+		# Utility to build detailed error context, phrased from operator's perspective
+		def make_detail(message: str, error_type: str, extra: dict = {}) -> dict:
+			return {
+				'message'    : message,
+				'error_type' : error_type,
+				'operator'   : operator_name,
+				'expected'   : expected_fields,
+				'actual'     : output,
+				**extra
+			}
 
+		# 1. Fail if operator does not define any output fields at all
+		if not expected_fields:
+			raise DapiException(
+				status_code = 500,
+				detail      = make_detail(
+					message    = f'Operator `{operator_name}` has no output fields defined in OutputType.',
+					error_type = 'MissingOutputFields'
+				),
+				severity = DapiException.HALT
+			)
+
+		# 2. Single-field output — value must be scalar (not tuple/dict)
 		if len(expected_fields) == 1:
-			# Single field — output must be a single value
 			return { expected_fields[0]: output }
 
-		else:
-			# Multiple fields — output must be a tuple matching the fields
-			if not isinstance(output, tuple):
-				raise ValueError(f'[OperatorService] Operator `{operator_name}` expected a tuple output for fields {expected_fields}, got {type(output).__name__} instead.')
+		# 3. Multi-field output — value must be tuple of correct length
+		if not isinstance(output, tuple):
+			raise DapiException(
+				status_code = 422,
+				detail      = make_detail(
+					message    = (
+						f'Operator `{operator_name}` must return a tuple with values for fields: '
+						f'{", ".join(expected_fields)} — got {type(output).__name__} instead.'
+					),
+					error_type = 'InvalidOutputType',
+					extra      = { 'actual_type': type(output).__name__ }
+				),
+				severity = DapiException.HALT
+			)
 
-			if len(output) != len(expected_fields):
-				raise ValueError(f'[OperatorService] Operator `{operator_name}` output tuple length mismatch. Expected {len(expected_fields)}, got {len(output)}.')
+		# 4. Tuple length mismatch — output must match exactly
+		if len(output) != len(expected_fields):
+			raise DapiException(
+				status_code = 422,
+				detail      = make_detail(
+					message    = (
+						f'Operator `{operator_name}` returned tuple of length {len(output)}, '
+						f'but OutputType declares {len(expected_fields)} fields: {", ".join(expected_fields)}.'
+					),
+					error_type = 'OutputLengthMismatch'
+				),
+				severity = DapiException.HALT
+			)
 
-			return { field: value for field, value in zip(expected_fields, output) }
-
+		# 5. Build named output dict from tuple
+		return { field: value for field, value in zip(expected_fields, output) }
 
 	async def unwrap_output(self, operator_name: str, output_dict: dict) -> Any: # TODO: refactor
 		'''
@@ -330,7 +420,6 @@ class OperatorService(DapiService):
 				importance  = 1,
 				detail      = str(input)
 			)
-
 			instance = Python(
 				operator_name          = name,
 				operator_class_name    = operator.class_name,

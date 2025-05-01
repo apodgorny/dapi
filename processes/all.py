@@ -56,7 +56,7 @@ class DoubleThenSquare(Operator):
 ################################################################
 
 ww.init()
-ww.invoke('times_two',
+ww.invoke('double_then_square',
 	x = 3
 )
 

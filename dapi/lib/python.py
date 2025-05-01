@@ -42,14 +42,15 @@ class Python:
 
 	async def _initialize(self):
 		self.env_stack = []
+		tree = ast.parse(self.code, filename='<python>')
 
 		if self.restrict:
-			tree     = ast.parse(self.code, filename='<python>')
 			self._detect_dangerous_calls(tree)
 			compiled = self._rewrite_calls(self.code)
 			self._apply_restrictions(self.globals)
 		else:
-			compiled = compile(self.code, filename='<python>', mode='exec')
+			compiled = self._rewrite_calls(self.code)
+			# compiled = compile(self.code, filename='<python>', mode='exec')
 
 		self.globals['_wrap_call_async'] = self._wrap_call_async
 		exec(compiled, self.globals)
@@ -82,14 +83,14 @@ class Python:
 		tree = ast.parse(code_str, filename='<python>')
 
 		class CallRewriter(ast.NodeTransformer):
-			def __init__(self, allowed_names: set[str]):
+			def __init__(self, globals: set[str]):
 				super().__init__()
-				self.allowed_names = allowed_names
+				self.globals = globals
 
 			def visit_Call(self, node: ast.Call) -> ast.AST:
 				self.generic_visit(node)
 				if isinstance(node.func, ast.Name):
-					if node.func.id in self.allowed_names:
+					if node.func.id in self.globals:
 						return node # skip rewriting known globals like call, ask, print
 
 					return ast.copy_location(ast.Call(
@@ -107,8 +108,7 @@ class Python:
 					), node)
 				return node
 
-		allowed_names = set(self.globals.keys())
-		tree = CallRewriter(allowed_names).visit(tree)
+		tree = CallRewriter(self.globals).visit(tree)
 
 		ast.fix_missing_locations(tree)
 		return compile(tree, filename='<python>', mode='exec')
@@ -150,11 +150,3 @@ class Python:
 			return await invoke_method(**self.input)
 		finally:
 			self.execution_context.pop()
-
-	############################################################################
-
-	def _instance_wrapper(self):
-		return type('SelfWrapper', (), {
-			'print': print,
-			'call' : lambda *a, **kw: self.call_external_operator(*a, **kw)
-		})()

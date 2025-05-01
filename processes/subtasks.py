@@ -48,8 +48,7 @@ class Main(Operator):
 		result: Dict[str, Any]
 
 	async def invoke(self, task, depth, spread):
-		return await call(
-			'branch_recursion',
+		return await recursor(
 			generator_name  = 'task_splitter',
 			generator_input = { 'item': task },
 			depth           = depth,
@@ -59,8 +58,18 @@ class Main(Operator):
 ################################################################
 
 ww.init()
-ww.invoke('main',
+result = ww.invoke('main',
 	task   = 'Write a book on AI philosophy',
 	depth  = 2,
-	spread = 3
+	spread = 2
 )
+
+def display_tree(node, indent=0):
+	'''Recursively prints a tree based on 'in' fields.'''
+	if not node:
+		return
+	print('    ' * indent + str(node.get('in', '')))
+	for child in node.get('out', []):
+		display_tree(child, indent + 1)
+
+display_tree(result['output']['result'])
