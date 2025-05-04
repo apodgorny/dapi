@@ -43,7 +43,7 @@ class Antagonist(Agent):
 		Используй русские имена. Имя должно отличаться от ключевого персонажа и соответствовать полу.
 
 		Представь результат в формате JSON:
-	''' +  Persona.prompt(omit=['personality'])
+	''' +  Persona.prompt()
 
 
 	async def invoke(self, title, idea, theme, character):
@@ -52,7 +52,7 @@ class Antagonist(Agent):
 			title     = title,
 			idea      = idea,
 			theme     = theme,
-			character = character.omit('personality')
+			character = character
 		)
 		print(prompt)
 		return await self.ask(prompt=prompt)

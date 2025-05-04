@@ -1,19 +1,10 @@
 from pydantic import BaseModel, Field
 from typing   import Any, get_args, Union, List, Dict
 
-
 class O(BaseModel):
-	# @classmethod
-	# def Field(cls, *args, **kwargs):
-	# 	return Field(*args, **kwargs)
-
 	@classmethod
-	def Field(cls, *args, description=None, **kwargs):
-		# Inject description into json_schema_extra
-		if description:
-			kwargs.setdefault('json_schema_extra', {})['description'] = description
-
-		return Field(*args, description=description, **kwargs)
+	def Field(cls, default=None, *, description=None):
+		return Field(default, description=description)
 
 	def __str__(self) -> str:
 		'''Render current object values as JSON, including nested O structures.'''
@@ -58,11 +49,10 @@ class O(BaseModel):
 		visit(self, [])
 
 	@classmethod
-	def prompt(cls) -> str:
+	def as_llm_schema(cls) -> str:
 		lines = []
 
 		def render(model_cls: type[BaseModel], indent=0, desc: str | None = None):
-			desc = desc or ''
 			pad = '  ' * indent
 			lines.append(pad + '{')
 
@@ -91,7 +81,7 @@ class O(BaseModel):
 					c_desc  = field.description
 					key_str = '  ' * (indent + 1) + f'"{name}": '
 					value   = render_type(field.annotation, indent + 1)
-					comment = f'  # {c_desc}' if c_desc else f'{outer_desc}'
+					comment = f'  # {c_desc}' if c_desc else ''
 					sub_lines.append(key_str + value + comment)
 				sub_lines.append('  ' * indent + '}')
 				return '\n'.join(sub_lines)
@@ -100,7 +90,7 @@ class O(BaseModel):
 				item_type = args[0] if args else Any
 				if hasattr(item_type, 'model_fields'):
 					inner = render_type(item_type, indent + 1)
-					return '[\n' + inner + '\n' + '  ' * indent + ', ... ]'
+					return '[\n' + inner + '\n' + '  ' * indent + '  ... ]'
 				else:
 					return f'[ {get_typename(item_type)} ]'
 
@@ -128,7 +118,6 @@ class O(BaseModel):
 
 		render(cls)
 		return '\n'.join(lines)
-
 
 	@classmethod
 	def from_dict(cls, data: dict) -> 'O':
@@ -163,3 +152,35 @@ class O(BaseModel):
 		'''Return description of a field or empty string.'''
 		info = self.model_fields.get(field)
 		return info.description or ''
+
+
+
+
+
+
+
+class Address(O):
+	city: str = Field(..., description='City of residence')
+	zip : int = Field(..., description='Postal code')
+
+class Tag(O):
+	name     : str = Field(..., description='Tag name')
+	priority : int = Field(..., description='Tag priority')
+
+class User(O):
+	name    : str              = Field(..., description='Full name')
+	address : Address          = Field(..., description='Current address')
+	tags    : list[Tag]        = Field(..., description='List of user tags')
+	notes   : dict[str, int]   = Field(..., description='Arbitrary numeric notes')
+
+# user = User(
+# 	name='Alice',
+# 	address=Address(city='Kyiv', zip=12345),
+# 	tags=[
+# 		Tag(name='admin', priority=1),
+# 		Tag(name='beta',  priority=2)
+# 	],
+# 	notes={'score': 10, 'year': 2025}
+# )
+
+print(User.as_llm_schema())

@@ -32,7 +32,7 @@ class Protogonist(Agent):
 		Создай имя соответствующее полу.
 		Прояви креативность.
 		Представь результат в формате JSON:
-	''' + Persona().__repr__()
+	''' + Persona.prompt()
 
 	async def invoke(self, title, idea, theme):
 		print(Persona, builtins.type(Persona))

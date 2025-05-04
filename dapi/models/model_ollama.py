@@ -47,9 +47,9 @@ class ModelOllama(Model):
 		temperature     : float = 0.0,
 		system          : str | None = None
 	) -> dict:
-		print('='*30)
-		print(response_schema)
-		print('='*30)
+		# print('='*30)
+		# print(response_schema)
+		# print('='*30)
 		params = {
 			'model'    : self.name,
 			'messages' : [{

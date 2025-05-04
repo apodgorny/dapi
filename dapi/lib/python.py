@@ -145,10 +145,6 @@ class Python:
 
 	async def invoke(self):
 		await self._initialize()
-		if 'Agent' in self.globals:
-			print('AGENT IN GLOBALS')
-		else:
-			print('AGENT NOT IN GLOBALS')
 		self.execution_context.push(self.operator_name, 1, 'restricted' if self.restrict else 'unrestricted')
 		try:
 			operator_class = self.globals.get(self.operator_class_name)

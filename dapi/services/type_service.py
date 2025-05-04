@@ -76,8 +76,8 @@ class TypeService(DapiService):
 		records = self.dapi.db.query(TypeRecord).all()
 		for r in records:
 			classes[r.name] = jscpy(r.type_schema, base_class=O)
-			print('= '*20)
-			print('---', r.name, '---')
-			print(json.dumps(classes[r.name].model_json_schema(), indent=4))
-			print('= '*20)
+			# print('= '*20)
+			# print('---', r.name, '---')
+			# print(json.dumps(classes[r.name].model_json_schema(), indent=4))
+			# print('= '*20)
 		return classes
