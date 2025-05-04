@@ -1,46 +1,129 @@
 import os, sys, inspect, httpx, ast, json
-from pathlib import Path
+
+from pathlib    import Path
 
 from .string    import String
 from .highlight import Highlight
-from .datum     import Datum
+
+from dapi.lib   import Operator, Agent, AgentOnGrid, Datum, O
 
 
 PROJECT_PATH = os.environ.get('PROJECT_PATH')
 DAPI_CODE    = os.path.join(PROJECT_PATH, os.environ.get('DAPI_CODE'))
-DAPI_URL     = os.environ.get('DAPI_URL')
+DAPI_URL     = os.path.join(os.environ.get('DAPI_URL'))
 
 
-class Operator:
-	pass
+class Code:
+	'''Encapsulates all code generation and inspection logic for operators and types.'''
+
+	type_pool     = {}
+	operator_pool = {}
+
+	@staticmethod
+	def get_code_and_schema(obj):
+		try:
+			code = String.unindent(inspect.getsource(obj))
+		except TypeError as e:
+			raise ValueError(f'Cannot get source code of `{obj.__name__}`. Ensure it is imported normally.') from e
+
+		if issubclass(obj, Operator):
+			input_type  = Datum(obj.InputType).to_dict(schema=True)  if hasattr(obj, 'InputType')  else {}
+			output_type = Datum(obj.OutputType).to_dict(schema=True) if hasattr(obj, 'OutputType') else {}
+			return {
+				'name'        : String.to_snake_case(obj.__name__),
+				'class_name'  : obj.__name__,
+				'input_type'  : input_type,
+				'output_type' : output_type,
+				'code'        : code,
+				'description' : inspect.getdoc(obj) or '',
+				'config'      : getattr(obj, 'config', {})
+			}
+		else:
+			raise TypeError('Unsupported object type for code and schema extraction')
+
+	@staticmethod
+	def collect_operators(objects):
+		Code.operator_pool = {
+			String.to_snake_case(obj.__name__): Code.get_code_and_schema(obj)
+			for name, obj in objects.items()
+			if inspect.isclass(obj)
+			and issubclass(obj, Operator)
+			and obj is not Operator
+			and name not in ['Agent', 'AgentOnGrid']
+		}
+		return list(Code.operator_pool.values())
+
+	@staticmethod
+	def collect_types(objects):
+		Code.type_pool = {}
+		seen = {}
+
+		def collect(cls):
+			name = cls.__name__
+			if name in seen:
+				return seen[name]
+
+			if not inspect.isclass(cls) or not issubclass(cls, O):
+				raise TypeError(f'Cannot collect non-O type: {cls}')
+
+			# Start with shallow schema
+			schema = Datum(cls).to_dict(schema=True)
+
+			# Recursively replace $ref with actual type schemas
+			def inline_refs(obj):
+				if isinstance(obj, dict):
+					if '$ref' in obj:
+						ref_name = obj['$ref'].split('/')[-1]
+						if ref_name not in objects:
+							raise ValueError(f'Referenced type `{ref_name}` not found in objects')
+						ref_cls = objects[ref_name]
+						ref_schema = collect(ref_cls)['type_schema']
+						return ref_schema
+					return {k: inline_refs(v) for k, v in obj.items()}
+				elif isinstance(obj, list):
+					return [inline_refs(i) for i in obj]
+				else:
+					return obj
+
+			final_schema = inline_refs(schema)
+
+			entry = {
+				'name'        : name,
+				'class_name'  : name,
+				'type_schema' : final_schema,
+				'code'        : String.unindent(inspect.getsource(cls)),
+				'description' : inspect.getdoc(cls) or ''
+			}
+
+			Code.type_pool[name] = entry
+			seen[name] = entry
+			return entry
+		#################################
+		for name, obj in objects.items():
+			if inspect.isclass(obj):
+				if issubclass(obj, O) and obj is not O:
+					collect(obj)
+
+		return list(Code.type_pool.values())
 
 
 class WordWield:
 	VERBOSE = True
 
-	####################################################################################
+	# Private methods
+	############################################################################
 
 	@staticmethod
-	def print(*args, **kwargs):
-		kwargs['flush'] = True
-		color = kwargs.pop('color', None)
-		if color:
-			args = [String.color(arg, color) for arg in args]
-		print(*args, **kwargs)
+	def _create_type(type_dict):
+		res = WordWield.request('POST', '/create_type', json=type_dict)
+		WordWield.success(f'Type `{type_dict["name"]}` created')
+		return res
 
 	@staticmethod
-	def success(message):
-		if WordWield.VERBOSE:
-			prefix = String.color('SUCCESS:', String.LIGHTGREEN)
-			WordWield.print(f'{prefix} {message}')
-
-	@staticmethod
-	def error(severity, message):
-		if not WordWield.VERBOSE:
-			return
-		prefix = String.color(severity.upper() + ':', WordWield._color(severity))
-		message = str(message).replace('\\n', '\n')
-		WordWield.print(f'{prefix} {message}')
+	def _create_operator(operator_dict):
+		res = WordWield.request('POST', '/create_operator', json=operator_dict)
+		WordWield.success(f'Operator `{operator_dict["name"]}` created')
+		return res
 
 	@staticmethod
 	def _color(severity):
@@ -89,25 +172,47 @@ class WordWield:
 		except Exception as e:
 			return 'halt', f'Could not parse DAPI error: {e}\nOriginal error: {json.dumps(data, indent=4)}', None
 
-	####################################################################################
+	# Public methods
+	############################################################################
 
 	@staticmethod
-	def serialize_operator_class(operator_class):
-		'''Serializes a single Python class to operator definition.'''
-		try:
-			code = String.unindent(inspect.getsource(operator_class))
-		except TypeError as e:
-			raise ValueError(f'Cannot get source code of `{operator_class.__name__}`. Ensure it is imported normally.') from e
+	def init():
+		'''Create all Operator and O-descendant types defined in the caller scope.'''
+		frame     = inspect.currentframe().f_back
+		module    = inspect.getmodule(frame)
+		objects   = vars(sys.modules[module.__name__])
 
-		return {
-			'name'        : String.to_snake_case(operator_class.__name__),
-			'class_name'  : operator_class.__name__,
-			'input_type'  : Datum(operator_class.InputType).to_dict(schema=True),
-			'output_type' : Datum(operator_class.OutputType).to_dict(schema=True),
-			'code'        : code,
-			'description' : inspect.getdoc(operator_class) or '',
-			'config'      : getattr(operator_class, 'config', {})
-		}
+		operators = Code.collect_operators(objects)
+
+		Code.collect_types(objects)  # populates type_pool including nested
+
+		for type_def in Code.type_pool.values():  # includes all, not just roots
+			WordWield._create_type(type_def)
+
+		for op_def in operators:
+			WordWield._create_operator(op_def)
+
+	@staticmethod
+	def print(*args, **kwargs):
+		kwargs['flush'] = True
+		color = kwargs.pop('color', None)
+		if color:
+			args = [String.color(arg, color) for arg in args]
+		print(*args, **kwargs)
+
+	@staticmethod
+	def success(message):
+		if WordWield.VERBOSE:
+			prefix = String.color('SUCCESS:', String.LIGHTGREEN)
+			WordWield.print(f'{prefix} {message}')
+
+	@staticmethod
+	def error(severity, message):
+		if not WordWield.VERBOSE:
+			return
+		prefix = String.color(severity.upper() + ':', WordWield._color(severity))
+		message = str(message).replace('\n', '\n')
+		WordWield.print(f'{prefix} {message}')
 
 	@staticmethod
 	def request(method: str, path: str, **kwargs):
@@ -149,53 +254,22 @@ class WordWield:
 			exit(1)
 
 	@staticmethod
-	def create_operator(operator_class):
-		source = WordWield.serialize_operator_class(operator_class)
-		data = {
-			'name'        : source['name'],
-			'class_name'  : source['class_name'],
-			'input_type'  : source['input_type'],
-			'output_type' : source['output_type'],
-			'code'        : source['code'],
-			'description' : source.get('description', '')
-		}
-		if 'config' in source:
-			data['config'] = source['config']
-
-		res = WordWield.request('POST', '/create_operator', json=data)
-		WordWield.success(f'Operator `{data["name"]}` created')
-		return res
-
-	@staticmethod
-	def init():
-		'''Create all Operator subclasses defined in the caller scope.'''
-		# 1. Получить frame, в котором вызван init()
-		frame = inspect.currentframe().f_back
-		locals_dict = frame.f_locals
-
-		# 2. Пройтись по всем локальным классам
-		for name, obj in locals_dict.items():
-			if (
-				inspect.isclass(obj)
-				and issubclass(obj, Operator)
-				and obj is not Operator
-			):
-				WordWield.create_operator(obj)
-
-	@staticmethod
-	def invoke(name: str, *args, **kwargs):
-		# Если передан один словарь как позиционный аргумент — это input_data
+	def invoke(operator: Operator, *args, **kwargs):
+		name = String.camel_to_snake(operator.__name__)
 		if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
 			input_data = args[0]
 		else:
 			input_data = kwargs
 
-		res = WordWield.request('POST', f'{name}', json=input_data)
+		result = WordWield.request('POST', f'{name}', json=input_data)
+		result = result['output']
 		WordWield.success(f'Invoked operator `{name}`:\n')
-		WordWield.print(Highlight.python(json.dumps(res, ensure_ascii=False, indent=4)))
-		return res
+		WordWield.print(Highlight.python(json.dumps(result, ensure_ascii=False, indent=4)))
 
+		if isinstance(result, dict) and hasattr(operator, 'OutputType') and issubclass(operator.OutputType, O):
+			return json.dumps(result, indent=4, ensure_ascii=False)
 
-
-# Alias for easy import
-ww = WordWield
+		result = tuple(result[k] for k in result)
+		if len(result) == 1:
+			result = result[0]
+		return result

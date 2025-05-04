@@ -1,0 +1,70 @@
+{
+	"duality": {
+		"name": "Покорность vs Бунт",
+		"poles": {
+			"yin": {
+				"authority": {
+					"name": "Мама",
+					"sex": "female",
+					"relation": "мать",
+					"age_diff": 25,
+					"since_age": 3,
+					"resource": {
+						"emotional": "одобрение",
+						"physical": "уход",
+						"mental": "советы",
+						"spiritual": "моральные принципы"
+					}
+				},
+				"judgement_to_self": "Ты эгоистка, если не заботишься о других",
+				"judgement_to_opposite": "Те, кто выступает, причиняют боль близким",
+				"square": {
+					"offended_guilty_ratio": 0.7,
+					"active_passive_ratio": 0.3
+				}
+			},
+			"yang": {
+				"authority": {
+					"name": "Отец",
+					"sex": "male",
+					"relation": "отец",
+					"age_diff": 30,
+					"since_age": 5,
+					"resource": {
+						"emotional": "восхищение",
+						"physical": "карманные деньги",
+						"mental": "убеждения",
+						"spiritual": "ценности свободы"
+					}
+				},
+				"judgement_to_self": "Ты трус, если не отстаиваешь своё",
+				"judgement_to_opposite": "Покорные — слабые и не живут своей жизнью",
+				"square": {
+					"offended_guilty_ratio": 0.4,
+					"active_passive_ratio": 0.9
+				}
+			}
+		},
+		"trauma": {
+			"setting": "развод родителей в 6 лет",
+			"actors": ["мать", "отец", "ребёнок"],
+			"since_age": 6,
+			"attributes": {
+				"triggers": ["крики", "конфликты", "уход близкого"],
+				"psychosomatics": ["зажим в груди", "головные боли"],
+				"key_phrases": ["Это всё из-за тебя", "Если бы ты слушалась", "Ты никогда не вырастешь нормальным человеком"]
+			},
+			"components": {
+				"physical": "ощущение холода и оцепенения в теле",
+				"emotional": "страх, стыд, беспомощность",
+				"mental": "убеждение 'я виновата в разрыве'",
+				"spiritual": "ощущение, что любовь требует жертвы"
+			},
+			"coping": {
+				"resource": "эмоциональное одобрение",
+				"actions": ["угождать", "избегать конфликтов", "идти на компромисс"],
+				"authority": "мать"
+			}
+		}
+	}
+}

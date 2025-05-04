@@ -5,6 +5,7 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
+    "debug.internalConsoleOptions": "neverOpen",
     "makefile.configureOnOpen": false,
     "folder-color.pathColors": [
         {

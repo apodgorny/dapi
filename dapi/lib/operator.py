@@ -36,22 +36,5 @@ class Operator:
 		'''Execute operator and return output Datum.'''
 		raise NotImplementedError('Operator must implement invoke method')
 
-	# For agents only
-	async def ask(self, *args, **kwargs):
-		if not hasattr(self, 'prompt'):
-			raise ValueError('Method call self.ask is only allowed for agent operators (self.prompt must be defined)')
-
-		# ask({ ... })
-		if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
-			input = args[0]
-		else:
-			input = kwargs
-
-		return await self.globals['ask'](
-			input           = input,
-			prompt          = self.prompt,
-			response_schema = self.output_type
-		)
-
 	def __repr__(self) -> str:
 		return f'<Operator {self.__class__.__name__}>'

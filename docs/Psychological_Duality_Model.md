@@ -1,0 +1,3 @@
+## Psychological Duality Model
+
+This document outlines a psychological schema in which human personality is modeled through a set of recurring dualities...

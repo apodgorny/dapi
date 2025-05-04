@@ -15,24 +15,13 @@ class Model:
 
 	##################################################################
 
-	def to_json_schema(self, schema: any) -> dict:
-		if isinstance(schema, Datum):		                            return schema.to_schema()
-		if isinstance(schema, type) and issubclass(schema, BaseModel):	return schema.model_json_schema()
-		if isinstance(schema, dict):		                            return schema
-		raise ValueError(f'Unsupported schema type: {type(schema).__name__}')
+	# def to_json_schema(self, schema: any) -> dict:
+	# 	if isinstance(schema, Datum):		                            return schema.to_schema()
+	# 	if isinstance(schema, type) and issubclass(schema, BaseModel):	return schema.model_json_schema()
+	# 	if isinstance(schema, dict):		                            return schema
+	# 	raise ValueError(f'Unsupported schema type: {type(schema).__name__}')
 
 	##################################################################
-
-	@staticmethod
-	def fill_prompt(template: str, input_data: dict) -> str:
-		template = String.unindent(template)
-		matches  = set(re.findall(r'\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}', template))
-
-		for path in matches:
-			if path not in input_data:
-				raise ValueError(f'[LLM] Field `{path}` mentioned in prompt, but not supplied')
-			template = template.replace(f'{{{{{path}}}}}', str(input_data[path]))
-		return template
 
 	@classmethod
 	def load(cls, model_id: str) -> 'Model':
@@ -61,8 +50,7 @@ class Model:
 	async def generate(
 		cls,
 		prompt          : str,
-		input           : dict,
-		response_schema : BaseModel,
+		response_schema : dict,
 
 		model_id        : str        = 'ollama::gemma3:4b',
 		role            : str        = 'user',
@@ -71,9 +59,11 @@ class Model:
 
 	) -> dict:
 		try:
-			prompt          = Model.fill_prompt(prompt, input)
-			model           = Model.load(model_id)
-			# response_schema = response_schema.model_json_schema()
+			if not isinstance(response_schema, type):
+				raise ValueError(f'Model.generate requires `response_schema` to be BaseModel, but received `{type(response_schema)}`')
+
+			model = Model.load(model_id)
+			response_schema = Datum(response_schema).to_dict(schema=True)
 
 			result = await model(
 				prompt          = prompt,
@@ -82,6 +72,9 @@ class Model:
 				temperature     = temperature,
 				system          = system
 			)
+
+			# Validate output via Datum
+			result = Datum(response_schema).validate(result)
 
 			# Convert to tuple to match minipython and fullpython
 			result = tuple(result[k] for k in result)

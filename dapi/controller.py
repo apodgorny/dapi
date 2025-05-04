@@ -1,9 +1,10 @@
 from dapi.lib       import Dapi, ExecutionContext
-from dapi.services  import DefinitionService, RuntimeService
+from dapi.services  import DefinitionService, RuntimeService, TypeService
 from dapi.schemas   import (
 	NameSchema,
 	EmptySchema,
 	StatusSchema,
+	TypeSchema,
 	OperatorSchema,
 	OperatorsSchema,
 	OperatorInputSchema,
@@ -11,12 +12,18 @@ from dapi.schemas   import (
 )
 
 dapi = Dapi(
+	TypeService,
 	DefinitionService,
-	RuntimeService
+	RuntimeService,
 )
 
 # DEFINITION endpoints
 ############################################################################
+
+@dapi.router.post('/create_type', response_model=TypeSchema)
+async def create_type(input: TypeSchema):
+	await dapi.type_service.create(input)
+	return input
 
 @dapi.router.post('/create_operator', response_model=OperatorSchema)
 async def create_operator(input: OperatorSchema):

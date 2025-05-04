@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing       import Any, Dict, List
+import random, builtins
+from typing       import Any, Dict, List, Optional
 from pydantic     import BaseModel
 
 from dapi.schemas import OperatorSchema
@@ -9,9 +10,12 @@ from dapi.lib     import (
 	DapiService,
 	ExecutionContext,
 	Python,
-	Operator,
 	Datum,
-	Model
+	Model,
+
+	Operator,
+	Agent,
+	AgentOnGrid
 )
 
 
@@ -21,28 +25,36 @@ class RuntimeService(DapiService):
 
 	############################################################################
 
-	def _get_operator_globals(self, context):
+	def _get_operator_globals(self, context=None):
 		operator_globals = {
-			'Operator'   : Operator,
-			'Datum'      : Datum,
-			'BaseModel'  : BaseModel,
-			'print'      : print,
-			'len'        : len,
-			'type'       : type,
-			'isinstance' : isinstance,
+			'Operator'    : Operator,
+			'Agent'       : Agent,
+			'AgentOnGrid' : AgentOnGrid,
 
-			'list'       : list,
-			'dict'       : dict,
-			'str'        : str,
-			'int'        : int,
-			'float'      : float,
-			'bool'       : bool,
-			'set'        : set,
-			'tuple'      : tuple,
+			'Datum'       : Datum,
+			'BaseModel'   : BaseModel,
+			'print'       : print,
+			'len'         : len,
+			'type'        : type,
+			'isinstance'  : isinstance,
+			'random'      : random,
 
-			'Dict'       : Dict,
-			'List'       : List,
-			'Any'        : Any
+			'list'        : list,
+			'dict'        : dict,
+			'str'         : str,
+			'int'         : int,
+			'float'       : float,
+			'bool'        : bool,
+			'set'         : set,
+			'tuple'       : tuple,
+
+			'Dict'        : Dict,
+			'List'        : List,
+			'Optional'    : Optional,
+			'Any'         : Any,
+
+			'__builtins__': builtins,
+			'builtins'    : builtins,
 		}
 
 		#-----------------------------------------------------------------#
@@ -61,7 +73,6 @@ class RuntimeService(DapiService):
 		operator_globals['call'] = _call
 		#-----------------------------------------------------------------#
 		async def _ask(
-			input,
 			prompt,
 			response_schema,
 
@@ -70,7 +81,6 @@ class RuntimeService(DapiService):
 		):
 			return await Model.generate(
 				prompt          = prompt,
-				input           = input,
 				response_schema = response_schema,
 				model_id        = model_id,
 				temperature     = temperature
@@ -78,6 +88,13 @@ class RuntimeService(DapiService):
 
 		operator_globals['ask'] = _ask
 		#-----------------------------------------------------------------#
+
+		try:
+			type_classes = self.dapi.type_service.get_all_classes()
+			operator_globals.update(type_classes)
+		except Exception as e:
+			raise DapiException.consume(e)
+
 		return operator_globals
 
 	############################################################################

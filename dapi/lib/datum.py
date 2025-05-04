@@ -8,6 +8,8 @@ import jsonschema
 from typing     import get_args, get_origin, List, Dict, Any, Self
 from pydantic   import BaseModel, ValidationError, create_model
 
+from .jscpy     import jscpy
+
 
 class DatumError(Exception):
 	def __init__(self, err: ValidationError, model_name='pydantic model'):
@@ -60,90 +62,68 @@ class Datum:
 
 	# @classmethod
 	# def jsonschema_to_basemodel(cls, schema: dict) -> type[BaseModel]:
+	# 	def convert(s, path):
+	# 		t = s.get('type')
+	# 		if t == 'object':
+	# 			props = s.get('properties', {})
+	# 			return create_model(
+	# 				'_'.join(path),
+	# 				__config__ = type('Config', (), {'extra': 'allow'}),
+	# 				**{k: (convert(v, path + [k]), ...) for k, v in props.items()}
+	# 			)
+	# 		if t == 'array':
+	# 			return List[convert(s.get('items', {}), path + ['Item'])]
+	# 		match t:
+	# 			case 'string'  : return str
+	# 			case 'number'  : return float
+	# 			case 'integer' : return int
+	# 			case 'boolean' : return bool
+	# 		raise DatumSchemaError(f'Unknown or missing type: {".".join(path)}')
+
 	# 	title = schema.get('title')
 	# 	props = schema.get('properties')
-
 	# 	if not isinstance(title, str)  : raise DatumSchemaError('Schema must have a valid "title"')
 	# 	if not isinstance(props, dict) : raise DatumSchemaError('Schema must have a "properties" object')
 
-	# 	map = {
-	# 		'boolean' : bool,
-	# 		'integer' : int,
-	# 		'number'  : float,
-	# 		'string'  : str,
-	# 	}
-
-	# 	def type(s, path):
-	# 		t = s.get('type')
-	# 		if t in map      : return map[t]
-	# 		if t == 'array'  : return List[type(s.get('items', {}), path + ['Item'])]
-	# 		if t == 'object' : return cls.jsonschema_to_basemodel({
-	# 			'title'      : '_'.join(path),
-	# 			'properties' : s.get('properties', {})
-	# 		})
-	# 		raise DatumSchemaError(f'Unsupported or missing type for property: {".".join(path)}')
-
-	# 	return create_model(title, **{
-	# 		k: (type(s, [title, k]), ...)
-	# 		for k, s in props.items()
-	# 	})
-
-	@classmethod
-	def jsonschema_to_basemodel(cls, schema: dict) -> type[BaseModel]:
-		def convert(s, path):
-			t = s.get('type')
-			if t == 'object':
-				props = s.get('properties', {})
-				return create_model(
-					'_'.join(path),
-					__config__ = type('Config', (), {'extra': 'allow'}),
-					**{k: (convert(v, path + [k]), ...) for k, v in props.items()}
-				)
-			if t == 'array':
-				return List[convert(s.get('items', {}), path + ['Item'])]
-			match t:
-				case 'string'  : return str
-				case 'number'  : return float
-				case 'integer' : return int
-				case 'boolean' : return bool
-			raise DatumSchemaError(f'Unknown or missing type: {".".join(path)}')
-
-		title = schema.get('title')
-		props = schema.get('properties')
-		if not isinstance(title, str)  : raise DatumSchemaError('Schema must have a valid "title"')
-		if not isinstance(props, dict) : raise DatumSchemaError('Schema must have a "properties" object')
-
-		return create_model(
-			title,
-			__config__ = type('Config', (), {'extra': 'allow'}),
-			**{k: (convert(s, [title, k]), ...) for k, s in props.items()}
-		)
-
+	# 	return create_model(
+	# 		title,
+	# 		__config__ = type('Config', (), {'extra': 'allow'}),
+	# 		**{k: (convert(s, [title, k]), ...) for k, s in props.items()}
+	# 	)
 
 	@classmethod
 	def dereference_schema(cls, schema: dict) -> dict:
 		def resolve_refs(obj, defs):
 			if isinstance(obj, dict):
-				result = {}
-				for k, v in obj.items():
-					if k == '$defs':
-						continue
-					elif k == '$ref' and isinstance(v, str) and v.startswith('#/$defs/'):
-						def_key = v[len('#/$defs/'):]
-						if def_key in defs:
-							return resolve_refs(defs[def_key], defs)
-					else:
-						result[k] = resolve_refs(v, defs)
-				return result
+				if '$ref' in obj:
+					ref_name = obj['$ref'].split('/')[-1]
+					
+					# Try from $defs
+					if ref_name in defs:
+						return resolve_refs(defs[ref_name], defs)
+
+					# Try from globals (must be a Pydantic model)
+					if ref_name in globals():
+						ref_cls = globals()[ref_name]
+						if hasattr(ref_cls, 'model_json_schema'):
+							return resolve_refs(ref_cls.model_json_schema(), defs)
+
+					# Fallback: raise error
+					raise DatumSchemaError(f'Referenced type `{ref_name}` not found in $defs or globals()')
+
+				return {k: resolve_refs(v, defs) for k, v in obj.items()}
+
 			elif isinstance(obj, list):
-				return [resolve_refs(i, defs) for i in obj]
+				return [resolve_refs(item, defs) for item in obj]
+
 			else:
 				return obj
 
 		copied = copy.deepcopy(schema)
 		defs   = copied.pop('$defs', {})
 		return resolve_refs(copied, defs)
-		
+
+
 	############################################################################
 
 	@property
@@ -178,13 +158,13 @@ class Datum:
 		elif isinstance(source, str):
 			schema = json.loads(source)
 			Datum.assert_valid_jsonschema(schema)
-			self._schema = self.jsonschema_to_basemodel(schema)
+			self._schema = jscpy(schema)
 			self._model  = None
 
 		elif isinstance(source, dict):
 			Datum.assert_valid_jsonschema(source)
 			source = Datum.dereference_schema(source)
-			self._schema = Datum.jsonschema_to_basemodel(source)
+			self._schema = jscpy(source)
 			self._model  = None
 
 		else:
@@ -238,7 +218,7 @@ class Datum:
 			if k != 'required'
 		}
 		schema = json.loads(json.dumps(schema))  # shallow sanitize to remove `None`
-		model  = self.jsonschema_to_basemodel(schema)
+		model  = jscpy(schema)
 		def none(fields):
 			return {
 				k: none(t.model_fields) if hasattr(t := f.annotation, 'model_fields') else

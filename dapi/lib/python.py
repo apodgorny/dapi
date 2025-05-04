@@ -1,4 +1,4 @@
-import ast, types
+import ast, types, linecache
 from typing import Callable, Any, Optional, Awaitable
 from .execution_context import ExecutionContext
 
@@ -37,12 +37,13 @@ class Python:
 		self.globals                = { **operator_globals }
 		self.i                      = execution_context.i
 		self.restrict               = restrict
+		self.filename               = f'<operator:{self.operator_name}>'
 
 	############################################################################
 
 	async def _initialize(self):
 		self.env_stack = []
-		tree = ast.parse(self.code, filename='<python>')
+		tree = ast.parse(self.code, filename=self.filename)
 
 		if self.restrict:
 			self._detect_dangerous_calls(tree)
@@ -50,7 +51,7 @@ class Python:
 			self._apply_restrictions(self.globals)
 		else:
 			compiled = self._rewrite_calls(self.code)
-			# compiled = compile(self.code, filename='<python>', mode='exec')
+			# compiled = compile(self.code, filename=self.filename, mode='exec')
 
 		self.globals['_wrap_call_async'] = self._wrap_call_async
 		exec(compiled, self.globals)
@@ -80,7 +81,7 @@ class Python:
 	############################################################################
 
 	def _rewrite_calls(self, code_str: str) -> types.CodeType:
-		tree = ast.parse(code_str, filename='<python>')
+		tree = ast.parse(code_str, filename=self.filename)
 
 		class CallRewriter(ast.NodeTransformer):
 			def __init__(self, globals: set[str]):
@@ -108,10 +109,18 @@ class Python:
 					), node)
 				return node
 
+		# 🔧 применяем AST преобразования
 		tree = CallRewriter(self.globals).visit(tree)
-
 		ast.fix_missing_locations(tree)
-		return compile(tree, filename='<python>', mode='exec')
+
+		# 🔥 добавляем код в linecache под псевдо-именем
+		linecache.cache[self.filename] = (
+			len(code_str),
+			None,
+			code_str.splitlines(True),
+			self.filename
+		)
+		return compile(tree, filename=self.filename, mode='exec')
 
 	############################################################################
 
@@ -136,6 +145,10 @@ class Python:
 
 	async def invoke(self):
 		await self._initialize()
+		if 'Agent' in self.globals:
+			print('AGENT IN GLOBALS')
+		else:
+			print('AGENT NOT IN GLOBALS')
 		self.execution_context.push(self.operator_name, 1, 'restricted' if self.restrict else 'unrestricted')
 		try:
 			operator_class = self.globals.get(self.operator_class_name)
