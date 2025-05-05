@@ -1,6 +1,7 @@
 import os, sys, inspect, httpx, ast, json
 
 from pathlib    import Path
+from pydantic   import BaseModel
 
 from .string    import String
 from .highlight import Highlight
@@ -108,7 +109,7 @@ class Code:
 
 
 class WordWield:
-	VERBOSE = True
+	VERBOSE = False
 
 	# Private methods
 	############################################################################
@@ -253,23 +254,110 @@ class WordWield:
 			WordWield.error('halt', str(e))
 			exit(1)
 
+	# @staticmethod
+	# def invoke(operator: Operator, *args, **kwargs):
+	# 	name = String.camel_to_snake(operator.__name__)
+	# 	if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
+	# 		input_data = args[0]
+	# 	else:
+	# 		input_data = kwargs
+
+	# 	result = WordWield.request('POST', f'{name}', json=input_data)
+	# 	result = result['output']
+	# 	WordWield.success(f'Invoked operator `{name}`:\n')
+	# 	WordWield.print(Highlight.python(json.dumps(result, ensure_ascii=False, indent=4)))
+
+	# 	if isinstance(result, dict) and hasattr(operator, 'OutputType') and issubclass(operator.OutputType, O):
+	# 		return operator.OutputType.from_dict(result)
+
+	# 	result = tuple(result[k] for k in result)
+	# 	if len(result) == 1:
+	# 		result = result[0]
+	# 	return result
+
+	# @staticmethod
+	# def invoke(operator: Operator, *args, **kwargs):
+	# 	name = String.camel_to_snake(operator.__name__)
+	# 	if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
+	# 		input_data = args[0]
+	# 	else:
+	# 		input_data = kwargs
+
+	# 	# ✅ Рекурсивно сериализуем все O-модели
+	# 	def serialize(value):
+	# 		if isinstance(value, O):
+	# 			return {
+	# 				k: serialize(v)
+	# 				for k, v in value.model_dump().items()
+	# 			}
+	# 		elif isinstance(value, list):
+	# 			return [serialize(i) for i in value]
+	# 		elif isinstance(value, dict):
+	# 			return {k: serialize(v) for k, v in value.items()}
+	# 		else:
+	# 			return value
+
+	# 	input_data = serialize(input_data)
+
+	# 	result = WordWield.request('POST', f'{name}', json=input_data)
+	# 	result = result['output']
+
+	# 	WordWield.success(f'Invoked operator `{name}`:\n')
+	# 	WordWield.print(Highlight.python(json.dumps(result, ensure_ascii=False, indent=4)))
+
+	# 	# ✅ Автовозврат модели, если OutputType указан
+	# 	if isinstance(result, dict) and hasattr(operator, 'OutputType') and issubclass(operator.OutputType, O):
+	# 		return operator.OutputType.from_dict(result)
+
+	# 	# ✅ Распаковка
+	# 	result = tuple(result[k] for k in result)
+	# 	if len(result) == 1:
+	# 		result = result[0]
+	# 	return result
+
 	@staticmethod
 	def invoke(operator: Operator, *args, **kwargs):
 		name = String.camel_to_snake(operator.__name__)
+
 		if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
 			input_data = args[0]
 		else:
 			input_data = kwargs
 
-		result = WordWield.request('POST', f'{name}', json=input_data)
-		result = result['output']
+		# ✅ Recursively convert all O models to dicts
+		def to_json_safe(obj):
+			if hasattr(obj, 'to_dict'):
+				return obj.to_dict()
+			if isinstance(obj, dict):
+				return {k: to_json_safe(v) for k, v in obj.items()}
+			if isinstance(obj, list):
+				return [to_json_safe(i) for i in obj]
+			return obj
+
+		input_data = to_json_safe(input_data)
+
+		# 🧠 Validate OutputType presence
+		if not hasattr(operator, 'OutputType'):
+			raise TypeError(f'Operator {operator.__name__} must define OutputType')
+
+		OutputType = operator.OutputType
+
+		if not issubclass(OutputType, BaseModel):
+			raise TypeError(f'OutputType of {operator.__name__} must be subclass of `BaseModel`')
+
+		# 🌐 Request and parse response
+		result_dict = WordWield.request('POST', f'{name}', json=input_data)['output']
+
+		# 📎 Show result
 		WordWield.success(f'Invoked operator `{name}`:\n')
-		WordWield.print(Highlight.python(json.dumps(result, ensure_ascii=False, indent=4)))
+		WordWield.print(Highlight.python(json.dumps(result_dict, ensure_ascii=False, indent=4)))
 
-		if isinstance(result, dict) and hasattr(operator, 'OutputType') and issubclass(operator.OutputType, O):
-			return json.dumps(result, indent=4, ensure_ascii=False)
+		# 📦 Convert to model
+		output_model = OutputType.model_validate(result_dict)
 
-		result = tuple(result[k] for k in result)
-		if len(result) == 1:
-			result = result[0]
-		return result
+		# 🎯 Unpack
+		fields = list(OutputType.model_fields)
+		if len(fields) == 1:
+			return getattr(output_model, fields[0])
+		else:
+			return tuple(getattr(output_model, f) for f in fields)

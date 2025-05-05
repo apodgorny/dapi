@@ -2,7 +2,7 @@ from dapi.lib import O
 
 
 class Resource(O):
-	'''Describes the types of resources provided by an authority figure.'''
+	'''Describes pleasant pro-survival vibe or input provided by another.'''
 	emotional : str = O.Field('', description='Emotional support or validation this authority provides')
 	physical  : str = O.Field('', description='Physical help or care this authority provides')
 	mental    : str = O.Field('', description='Ideas, knowledge, or advice provided')

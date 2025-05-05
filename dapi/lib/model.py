@@ -63,20 +63,20 @@ class Model:
 				raise ValueError(f'Model.generate requires `response_schema` to be BaseModel, but received `{type(response_schema)}`')
 
 			model = Model.load(model_id)
-			response_schema = Datum(response_schema).to_dict(schema=True)
+			response_json_schema = Datum(response_schema).to_dict(schema=True)
 
 			result = await model(
 				prompt          = prompt,
-				response_schema = response_schema,
+				response_schema = response_json_schema,
 				role            = role,
 				temperature     = temperature,
 				system          = system
 			)
 
 			# Validate output via Datum
-			result = Datum(response_schema).validate(result)
+			Datum(response_schema).validate(result)
 
-			# Convert to tuple to match minipython and fullpython
+			# Unpack to tuple of attributes or single value to match operator output convention
 			result = tuple(result[k] for k in result)
 			if len(result) == 1:
 				result = result[0]

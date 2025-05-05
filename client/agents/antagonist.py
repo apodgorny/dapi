@@ -8,8 +8,8 @@ from wordwield.wordwield  import (
 	Agent,
 )
 
-# Import from processes.schemas package
-from processes.schemas import Persona
+# Import from client.schemas package
+from client.schemas import Persona
 
 
 class Antagonist(Agent):

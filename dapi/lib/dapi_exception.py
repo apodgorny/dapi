@@ -1,6 +1,7 @@
 import traceback
 from pathlib           import Path
 
+from pydantic          import BaseModel
 from fastapi           import HTTPException
 from starlette.status  import HTTP_400_BAD_REQUEST
 
@@ -10,15 +11,48 @@ class DapiException(HTTPException):
 	BEWARE = 'beware'
 	FYI    = 'fyi'
 
+	# def __init__(
+	# 	self,
+	# 	status_code : int         = HTTP_400_BAD_REQUEST,
+	# 	detail      : str         = 'An error occurred',
+	# 	severity    : str         = None,
+	# 	headers     : dict | None = None,
+	# 	context     : dict | None = None
+	# ):
+	# 	severity = severity if severity in [self.HALT, self.BEWARE, self.FYI] else self.HALT
+
+	# 	data = {
+	# 		'detail'   : detail,
+	# 		'severity' : severity,
+	# 	}
+	# 	if context:
+	# 		data.update(context)
+
+	# 	super().__init__(
+	# 		status_code = status_code,
+	# 		headers     = headers,
+	# 		detail      = data
+	# 	)
+
 	def __init__(
 		self,
 		status_code : int         = HTTP_400_BAD_REQUEST,
-		detail      : str         = 'An error occurred',
+		detail      : str | dict  = 'An error occurred',
 		severity    : str         = None,
 		headers     : dict | None = None,
 		context     : dict | None = None
 	):
 		severity = severity if severity in [self.HALT, self.BEWARE, self.FYI] else self.HALT
+
+		# ✨ Ensure everything is JSON-serializable
+		def to_serializable(obj):
+			if isinstance(obj, BaseModel):
+				return obj.model_dump()
+			if isinstance(obj, dict):
+				return {k: to_serializable(v) for k, v in obj.items()}
+			if isinstance(obj, list):
+				return [to_serializable(v) for v in obj]
+			return obj
 
 		data = {
 			'detail'   : detail,
@@ -27,10 +61,12 @@ class DapiException(HTTPException):
 		if context:
 			data.update(context)
 
+		data = to_serializable(data)
+
 		super().__init__(
 			status_code = status_code,
+			detail      = data,
 			headers     = headers,
-			detail      = data
 		)
 
 	########################################################################

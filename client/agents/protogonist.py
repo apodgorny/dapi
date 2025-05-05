@@ -11,8 +11,8 @@ from wordwield.wordwield  import (
 	AgentOnGrid,
 )
 
-# Import from processes.schemas package
-from processes.schemas import Persona
+# Import from client.schemas package
+from client.schemas import Persona
 
 
 class Protogonist(Agent):
@@ -21,7 +21,8 @@ class Protogonist(Agent):
 		idea  : str
 		theme : str
 
-	OutputType = Persona
+	class OutputType(BaseModel):
+		persona: Persona
 
 	template = '''
 		Ты писатель. Пишешь книгу под названием "{{title}}".
@@ -32,7 +33,7 @@ class Protogonist(Agent):
 		Создай имя соответствующее полу.
 		Прояви креативность.
 		Представь результат в формате JSON:
-	''' + Persona.prompt()
+	''' + '{ persona: ' + Persona.prompt() + '}'
 
 	async def invoke(self, title, idea, theme):
 		print(Persona, builtins.type(Persona))

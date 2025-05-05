@@ -1,4 +1,5 @@
 from .persona    import Persona
+from .character  import Character
 from .psychology import (
 	Personality,
 	Duality,

@@ -109,7 +109,7 @@ class RuntimeService(DapiService):
 	async def invoke(self, name: str, input: dict, context: ExecutionContext) -> dict:
 		if context is None:
 			raise ValueError('ExecutionContext must be explicitly provided')
-		
+
 		self.i = context.i
 
 		operator         = self.dapi.definition_service.require(name)
@@ -117,6 +117,10 @@ class RuntimeService(DapiService):
 		output           = ''
 
 		try:
+			# Input is validated in sub-calls, but not in direct call.
+			# Here's additional layer of validation for that
+			Datum(operator.input_type).validate(input)
+
 			context.push(
 				name        = name,
 				lineno      = 1,

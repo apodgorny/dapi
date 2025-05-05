@@ -10,8 +10,8 @@ from wordwield.wordwield  import (
 	AgentOnGrid,
 )
 
-# Import from processes.schemas package
-from processes.schemas import Persona
+# Import from client.schemas package
+from client.schemas import Persona
 
 
 class Character(Agent):

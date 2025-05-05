@@ -6,23 +6,26 @@ from pydantic             import BaseModel
 from typing               import List, Dict, Any
 
 # Use absolute imports to avoid issues when running script directly
-from processes.schemas import (
+from client.schemas import (
 	Persona,
 	Trauma,
 	Authority,
 	Duality,
-	PodgornySquare
+	PodgornySquare,
+	Personality,
+	Subpersonality,
+	Character
 )
-from processes.agents import (
+from client.agents import (
 	Idea,
 	Interpretations,
 
-	Character,
 	Protogonist,
 	Antagonist,
 
 	Traumatologist,
 	Dualist,
+	Personalizer,
 	Psychologist,
 )
 
@@ -37,21 +40,22 @@ from wordwield.wordwield  import (
 if __name__ == '__main__':
 
 	ww.init()
-	initial_topic = 'Ромашка'
+	initial_topic = 'Муха'
 	theme         = 'Комедия'
 	topic         = ww.invoke(Interpretations, title=initial_topic, theme=theme, spread=10)
 	idea          = ww.invoke(Idea,            topic=topic, theme=theme)
-	protogonist   = ww.invoke(Protogonist,     title=topic, idea=idea, theme=theme)
+	protogonist_persona    = ww.invoke(Protogonist, title=topic, idea=idea, theme=theme)
+	print('protogonist_persona', type(protogonist_persona), protogonist_persona)
 	# antagonist    = ww.invoke(Antagonist,      title=topic, idea=idea, theme=theme, character=protogonist)
-	traumas, dualities = ww.invoke(Psychologist,    complexity=1, persona=protogonist)
+	protogonist_character  = ww.invoke(Psychologist, complexity=1, persona=protogonist_persona)
 
-	print('title',      initial_topic)
-	print('theme',      theme)
-	print('topic',      topic)
-	print('idea',       idea)
-	print('character',  protogonist)
-	print('traumas',    traumas)
-	print('dualities',  dualities)
+	print('title',       initial_topic)
+	print('theme',       theme)
+	print('topic',       topic)
+	print('idea',        idea)
+
+	protogonist_character.to_disk('/Users/alexander/my/dapi/client/data')
+	print(protogonist_character)
 	# print('antagonist', antagonist)
 	
 	# sg = StateGrid(

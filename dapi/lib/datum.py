@@ -173,8 +173,21 @@ class Datum:
 	############################################################################
 
 	def validate(self, data:dict):
+		def normalize_input(data):
+			def normalize(value):
+				if isinstance(value, BaseModel):
+					return value.model_dump()
+				elif isinstance(value, list):
+					return [normalize(v) for v in value]
+				elif isinstance(value, dict):
+					return {k: normalize(v) for k, v in value.items()}
+				else:
+					return value
+
+			return normalize(data)
+
 		datum = Datum(self.schema)
-		return datum.from_dict(data).to_dict()
+		return datum.from_dict(normalize_input(data)).to_dict()
 
 	def to_dict(self, *, schema: bool = False) -> dict:
 		if schema:

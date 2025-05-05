@@ -8,13 +8,14 @@ class Python:
 	BLOCKED_ATTRS   = {'__dict__', '__class__', '__globals__', '__code__'}
 	BLOCKED_GLOBALS = [
 		'__import__', 'eval', 'exec', 'open', 'compile', 'globals', 'locals',
-		'vars', 'getattr', 'setattr', 'delattr', 'super', 'type', 'object', 'dir'
+		'vars', 'getattr', 'setattr', 'delattr', 'super', 'object', 'dir'
 	]
 	ALLOWED_GLOBALS = {
 		'int': int, 'float': float, 'str': str, 'bool': bool,
 		'dict': dict, 'list': list, 'tuple': tuple, 'len': len,
 		'range': range, 'enumerate': enumerate, 'zip': zip,
-		'sum': sum, 'min': min, 'max': max, 'print': print
+		'sum': sum, 'min': min, 'max': max, 'print': print,
+		'type': type
 	}
 
 	def __init__(

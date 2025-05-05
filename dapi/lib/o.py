@@ -1,5 +1,9 @@
+import os, json
+from typing   import Any, get_args, get_origin, Union, List, Dict
+
 from pydantic import BaseModel, Field
-from typing   import Any, get_args, Union, List, Dict
+
+from .jscpy   import jscpy
 
 
 class O(BaseModel):
@@ -29,7 +33,6 @@ class O(BaseModel):
 			for k in self.model_fields
 		}
 		return json.dumps(result, indent=4, ensure_ascii=False)
-
 
 	def walk(self, f):
 		def visit(val: Any, path: list[str], hint: Any = None):
@@ -129,7 +132,6 @@ class O(BaseModel):
 		render(cls)
 		return '\n'.join(lines)
 
-
 	@classmethod
 	def from_dict(cls, data: dict) -> 'O':
 		'''Create instance from dict, with nested O reconstruction.'''
@@ -156,10 +158,49 @@ class O(BaseModel):
 		return cls(**parsed)
 
 	def to_dict(self) -> dict:
-		'''Return object as dict (non-recursive).'''
-		return self.model_dump()
+		'''Return deeply serialized dictionary, recursively converting nested O models.'''
+		def serialize(val):
+			if isinstance(val, O):
+				return val.to_dict()
+			if isinstance(val, (list, tuple)):
+				return [serialize(i) for i in val]
+			if isinstance(val, dict):
+				return {k: serialize(v) for k, v in val.items()}
+			return val
+
+		return {
+			k: serialize(getattr(self, k))
+			for k in self.model_fields
+		}
+
+	def to_json(self) -> str:
+		'''Return JSON string from deeply serialized dict.'''
+		return json.dumps(self.to_dict(), indent=4, ensure_ascii=False)
+
+	def __str__(self) -> str:
+		'''Default string representation is JSON.'''
+		return self.to_json()
 
 	def get_description(self, field: str) -> str:
 		'''Return description of a field or empty string.'''
 		info = self.model_fields.get(field)
 		return info.description or ''
+
+	@classmethod
+	def from_disk(cls, path: str):
+		with open(path, 'r', encoding='utf-8') as f:
+			obj   = json.load(f)
+			Model = jscpy(obj['schema'])
+			return Model(**obj['data'])
+
+	def to_disk(self, path: str):
+		if os.path.isdir(path):
+			filename = f'{self.__class__.__name__}.json'
+			path     = os.path.join(path, filename)
+
+		with open(path, 'w', encoding='utf-8') as f:
+			json.dump({
+				'schema': self.model_json_schema(),
+				'data'  : self.model_dump()
+			}, f, indent=4, ensure_ascii=False)
+
