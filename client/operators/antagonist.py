@@ -5,7 +5,7 @@ from pydantic             import BaseModel
 from typing               import List, Dict, Any
 
 from lib import (
-	Agent,
+	Agent, O
 )
 
 # Import from client.schemas package
@@ -13,13 +13,14 @@ from client.schemas import Persona
 
 
 class Antagonist(Agent):
-	class InputType(BaseModel):
+	class InputType(O):
 		title     : str
 		idea      : str
 		theme     : str
 		character : Persona  # protagonist
 
-	OutputType = Persona
+	class OutputType(O):
+		persona: Persona
 
 	template = '''
 		Ты писатель. Твоя задача — создать персонажа **антагониста**
@@ -41,10 +42,7 @@ class Antagonist(Agent):
 		Сделай антагониста эмоционально насыщенным и повествовательно мощным.
 		Не упоминай другого персонажа в описании антагониста.
 		Используй русские имена. Имя должно отличаться от ключевого персонажа и соответствовать полу.
-
-		Представь результат в формате JSON:
-	''' +  Persona.prompt()
-
+	'''
 
 	async def invoke(self, title, idea, theme, character):
 		prompt = self.fill(
@@ -54,5 +52,4 @@ class Antagonist(Agent):
 			theme     = theme,
 			character = character
 		)
-		print(prompt)
 		return await self.ask(prompt=prompt)

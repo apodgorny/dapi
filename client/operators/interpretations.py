@@ -2,6 +2,7 @@ from pydantic             import BaseModel
 from typing               import List, Dict, Any
 
 from lib import (
+	O,
 	Operator,
 	Agent,
 	AgentOnGrid,
@@ -9,15 +10,15 @@ from lib import (
 
 
 class Interpretations(Agent):
-	class InputType(BaseModel):
+	class InputType(O):
 		title  : str
 		theme  : str
 		spread : int
 
-	class OutputType(BaseModel):
+	class OutputType(O):
 		title : str
 
-	class Interpretations(BaseModel):
+	class Interpretations(O):
 		items: list[str]
 
 	prompt = '''

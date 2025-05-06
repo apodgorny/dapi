@@ -6,6 +6,7 @@ from pydantic             import BaseModel
 from typing               import List, Dict, Any
 
 from lib import (
+	O,
 	Operator,
 	Agent,
 	AgentOnGrid,
@@ -16,12 +17,12 @@ from client.schemas import Persona
 
 
 class Protogonist(Agent):
-	class InputType(BaseModel):
+	class InputType(O):
 		title : str
 		idea  : str
 		theme : str
 
-	class OutputType(BaseModel):
+	class OutputType(O):
 		persona: Persona
 
 	template = '''
@@ -32,8 +33,7 @@ class Protogonist(Agent):
 		Используй русские имена.
 		Создай имя соответствующее полу.
 		Прояви креативность.
-		Представь результат в формате JSON:
-	''' + '{ persona: ' + Persona.prompt() + '}'
+	'''
 
 	async def invoke(self, title, idea, theme):
 		print(Persona, builtins.type(Persona))
@@ -43,5 +43,4 @@ class Protogonist(Agent):
 			idea  = idea,
 			theme = theme
 		)
-		print(prompt)
 		return await self.ask(prompt=prompt)

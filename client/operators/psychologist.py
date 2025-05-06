@@ -5,16 +5,26 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from pydantic             import BaseModel
 from typing               import List
 
-from lib import Agent, WordWield as ww
-from client.schemas import Persona, Personality, Trauma, Duality, Subpersonality, Character
+from lib import (
+	O,
+	Agent
+)
+from client.schemas import (
+	Persona,
+	Personality,
+	Trauma,
+	Duality,
+	Subpersonality,
+	Character
+)
 
 
 class Traumatologist(Agent):
-	class InputType(BaseModel):
+	class InputType(O):
 		persona     : Persona
 		complexity  : int
 
-	class OutputType(BaseModel):
+	class OutputType(O):
 		traumas: list[Trauma]
 
 	t = {
@@ -28,12 +38,10 @@ class Traumatologist(Agent):
 				{{cta}}
 				Используй ассертивные, краткие и однозначные утверждения.
 				Сложи травматические данные в JSON (ВАЖНО: не оставляй поля пустыми):
-				
-			''' + '{ traumas: [' + Trauma.prompt() + ', ... ] }',
-		'cta_one':
-			'''Опиши главную травму детства этого человека''',
-		'cta_many':
-			'''Опиши список {{complexity}} главных травм детства этого человека.'''
+			''',
+
+		'cta_one'  : 'Опиши главную травму детства этого человека',
+		'cta_many' : 'Опиши список {{complexity}} главных травм детства этого человека.'
 	}
 
 	def get_traumas(self, persona, complexity):
@@ -47,7 +55,6 @@ class Traumatologist(Agent):
 			persona = persona,
 			cta     = cta
 		)
-		print(prompt)
 		return prompt
 
 	async def invoke(self, persona, complexity):
@@ -57,11 +64,11 @@ class Traumatologist(Agent):
 #####################################################################
 
 class Dualist(Agent):
-	class InputType(BaseModel):
+	class InputType(O):
 		persona  : Persona
 		trauma   : Trauma
 
-	class OutputType(BaseModel):
+	class OutputType(O):
 		duality: Duality
 
 	t = {
@@ -77,9 +84,8 @@ class Dualist(Agent):
 				Ты провёл опрос и теперь точно знаешь всё о дуальности сопутствующей этой травме.
 				Опиши дуальность.
 				Используй ассертивные, краткие и однозначные утверждения.
-				Сложи данные дуальности в JSON (ВАЖНО: не оставляй поля пустыми):
-				
-			''' + '{ duality: ' + Duality.prompt() + ' }',
+				(ВАЖНО: не оставляй поля пустыми):
+			'''
 	}
 
 	async def invoke(self, persona, trauma):
@@ -93,10 +99,10 @@ class Dualist(Agent):
 
 class Personalizer(Agent):
 
-	class InputType(BaseModel):
+	class InputType(O):
 		dualities : list[Duality]
 
-	class OutputType(BaseModel):
+	class OutputType(O):
 		personality: Personality
 
 	t = {
@@ -135,9 +141,7 @@ class Personalizer(Agent):
 				- Каждая сторона может входить только в одну субличность.
 				- Если сторона не находит себе пары — оформи её как отдельную субличность.
 				- Дай каждой субличности метафоричное или архетипическое имя (например: «Внутренний Творец», «Наблюдатель Боли», «Тихий Архитектор»).
-
-				Результат оформи в JSON следующего вида:
-			''' + '{ personality: ' + Personality.prompt() + '}'
+			'''
 	}
 
 	async def invoke(self, dualities):
@@ -149,11 +153,11 @@ class Personalizer(Agent):
 
 
 class Psychologist(Agent):
-	class InputType(BaseModel):
+	class InputType(O):
 		persona     : Persona
 		complexity  : int
 
-	class OutputType(BaseModel):
+	class OutputType(O):
 		character: Character
 
 	async def invoke(self, persona, complexity):

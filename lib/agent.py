@@ -21,8 +21,11 @@ class Agent(Operator):
 			template = template.replace(f'{{{{{path}}}}}', str(vars[path]))
 		return template
 
-	async def ask(self, prompt = None, schema = None):
+	async def ask(self, prompt = None, schema = None, output_repr=True):
+		schema = schema or self.OutputType
+		if output_repr:
+			prompt = prompt + '\nPut all data into JSON:\n' + schema.prompt()
 		return await self.globals['ask'](
 			prompt          = prompt,
-			response_schema = (schema or self.output_type)  # Passing BaseModel here
+			response_schema = schema  # BaseModel
 		)

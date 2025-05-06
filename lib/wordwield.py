@@ -7,7 +7,6 @@ from lib import String, Highlight, Operator, Agent, AgentOnGrid, Datum, O
 
 
 PROJECT_PATH = os.environ.get('PROJECT_PATH')
-DAPI_CODE    = os.path.join(PROJECT_PATH, os.environ.get('DAPI_CODE'))
 DAPI_URL     = os.path.join(os.environ.get('DAPI_URL'))
 
 
@@ -174,7 +173,7 @@ class WordWield:
 	############################################################################
 
 	@staticmethod
-	def init(scope):
+	def init():
 		'''Create all Operator and O-descendant types defined in the caller scope.'''
 		frame     = inspect.currentframe().f_back
 		module    = inspect.getmodule(frame)

@@ -1,5 +1,6 @@
 from typing import Callable
 
+from lib.o                 import O
 from lib.datum             import Datum
 from lib.string            import String
 from lib.autoargs          import autodecorate
@@ -31,6 +32,21 @@ class Operator:
 
 	def __init__(self, globals):
 		self.globals = globals
+
+		if not (
+			hasattr(self.__class__, 'InputType')             and
+			isinstance(self.__class__.InputType, type)       and
+			issubclass(self.__class__.InputType, O)
+		):
+			raise TypeError(f'InputType of operator `{self.__class__.__name__}` must be a class subclassing O')
+
+		if not (
+			hasattr(self.__class__, 'OutputType')            and
+			isinstance(self.__class__.OutputType, type)      and
+			issubclass(self.__class__.OutputType, O)
+		):
+			raise TypeError(f'OutputType of operator `{self.__class__.__name__}` must be a class subclassing O')
+
 
 	async def invoke(self) -> Datum:
 		'''Execute operator and return output Datum.'''

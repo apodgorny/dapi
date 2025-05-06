@@ -10,7 +10,7 @@
     "folder-color.pathColors": [
         {
             "folderPath": "dapi/lib/",
-            "color": "foldercolorizer.color_ffcc00"
+            "color": "foldercolorizer.color_ffff00"
         },
         {
             "folderPath": "dapi/services/",
@@ -27,6 +27,10 @@
         {
             "folderPath": "dapi/processes/",
             "color": "foldercolorizer.color_66ccff"
+        },
+        {
+            "folderPath": "dapi/client/",
+            "color": "foldercolorizer.color_ff99ff"
         }
     ]
 }

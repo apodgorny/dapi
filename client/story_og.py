@@ -35,12 +35,16 @@ from client.operators import (
 
 from lib import WordWield as ww
 
+PROJECT_PATH = os.environ.get('PROJECT_PATH')
+DATA_DIR     = os.environ.get('DATA_DIR')
+DATA_PATH    = os.path.join(PROJECT_PATH, DATA_DIR)
+
 
 ################################################################
 
 if __name__ == '__main__':
 
-	ww.init(globals())
+	ww.init()
 	print('done')
 	initial_topic = 'Муха'
 	theme         = 'Комедия'
@@ -51,12 +55,12 @@ if __name__ == '__main__':
 	# antagonist    = ww.invoke(Antagonist,      title=topic, idea=idea, theme=theme, character=protogonist)
 	protogonist_character  = ww.invoke(Psychologist, complexity=1, persona=protogonist_persona)
 
-	print('title',       initial_topic)
-	print('theme',       theme)
-	print('topic',       topic)
-	print('idea',        idea)
+	print('title', initial_topic)
+	print('theme', theme)
+	print('topic', topic)
+	print('idea',  idea)
 
-	protogonist_character.to_disk(os.path.join(DATA_DIR, 'protogonist.json'))
+	protogonist_character.to_disk(os.path.join(DATA_PATH, 'protogonist.json'))
 	print(protogonist_character)
 	# print('antagonist', antagonist)
 	

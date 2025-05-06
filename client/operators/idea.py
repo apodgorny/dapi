@@ -2,6 +2,7 @@ from pydantic             import BaseModel
 from typing               import List, Dict, Any
 
 from lib import (
+	O,
 	Operator,
 	Agent,
 	AgentOnGrid,
@@ -10,11 +11,11 @@ from lib import (
 
 class Idea(AgentOnGrid):
 
-	class InputType(BaseModel):
+	class InputType(O):
 		topic : str
 		theme : str
 
-	class OutputType(BaseModel):
+	class OutputType(O):
 		idea : str
 
 	template = '''

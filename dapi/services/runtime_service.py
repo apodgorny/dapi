@@ -12,6 +12,7 @@ from lib     import (
 	Datum,
 	Model,
 
+	O,
 	Operator,
 	Agent,
 	AgentOnGrid
@@ -31,6 +32,7 @@ class RuntimeService(DapiService):
 			'Agent'       : Agent,
 			'AgentOnGrid' : AgentOnGrid,
 
+			'O'           : O,
 			'Datum'       : Datum,
 			'BaseModel'   : BaseModel,
 			'print'       : print,
