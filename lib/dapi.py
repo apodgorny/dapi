@@ -6,8 +6,8 @@ from typing               import Any, Callable, Type, List, Dict
 from fastapi              import APIRouter
 from fastapi.responses    import JSONResponse
 
+from lib.string           import String
 from dapi.db              import Base, engine, SessionLocal
-from dapi.lib.string      import String
 from .dapi_exception      import DapiException
 
 ########################################################################

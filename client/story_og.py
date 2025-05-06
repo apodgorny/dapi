@@ -5,6 +5,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from pydantic             import BaseModel
 from typing               import List, Dict, Any
 
+DATA_DIR = os.environ.get('DATA_DIR')
+
+# from lib.debug import debugpy
+
 # Use absolute imports to avoid issues when running script directly
 from client.schemas import (
 	Persona,
@@ -16,7 +20,7 @@ from client.schemas import (
 	Subpersonality,
 	Character
 )
-from client.agents import (
+from client.operators import (
 	Idea,
 	Interpretations,
 
@@ -29,17 +33,15 @@ from client.agents import (
 	Psychologist,
 )
 
-from wordwield.wordwield  import (
-	Agent,
-	WordWield as ww
-)
+from lib import WordWield as ww
 
 
 ################################################################
 
 if __name__ == '__main__':
 
-	ww.init()
+	ww.init(globals())
+	print('done')
 	initial_topic = 'Муха'
 	theme         = 'Комедия'
 	topic         = ww.invoke(Interpretations, title=initial_topic, theme=theme, spread=10)
@@ -54,7 +56,7 @@ if __name__ == '__main__':
 	print('topic',       topic)
 	print('idea',        idea)
 
-	protogonist_character.to_disk('/Users/alexander/my/dapi/client/data')
+	protogonist_character.to_disk(os.path.join(DATA_DIR, 'protogonist.json'))
 	print(protogonist_character)
 	# print('antagonist', antagonist)
 	

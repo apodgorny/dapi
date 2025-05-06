@@ -5,8 +5,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from pydantic             import BaseModel
 from typing               import List
 
-from wordwield.wordwield  import Agent, WordWield as ww
-from client.schemas       import Persona, Personality, Trauma, Duality, Subpersonality, Character
+from lib import Agent, WordWield as ww
+from client.schemas import Persona, Personality, Trauma, Duality, Subpersonality, Character
 
 
 class Traumatologist(Agent):
@@ -165,10 +165,6 @@ class Psychologist(Agent):
 			dualities.append(duality)
 
 		personality = await personalizer(dualities=dualities)
-
-		print('#'*30)
-		print(type(persona), type(personality), type(traumas[0]), type(dualities[0]))
-		print('#'*30)
 
 		return Character(
 			persona     = persona,

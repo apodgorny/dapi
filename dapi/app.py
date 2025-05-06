@@ -15,7 +15,7 @@ app.add_middleware(
 	allow_headers     = ['*'],
 	allow_credentials = True,
 )
-app.middleware('http')(enhance_openapi_schema)
+# app.middleware('http')(enhance_openapi_schema)
 dapi.start(app)
 
 @app.on_event('startup')

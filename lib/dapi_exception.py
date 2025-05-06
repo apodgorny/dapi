@@ -74,7 +74,7 @@ class DapiException(HTTPException):
 	@staticmethod
 	def consume(e: Exception) -> 'DapiException':
 		# raise e
-		# from dapi.lib.mini_python import MiniPythonRuntimeError
+		# from lib.mini_python import MiniPythonRuntimeError
 		error = None
 		
 		'''

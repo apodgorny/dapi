@@ -1,9 +1,10 @@
 import os, ast
-from pathlib import Path
+from pathlib    import Path
 
-from pydantic        import BaseModel
-from dapi.lib        import String
-from dapi.lib.module import Module
+from pydantic   import BaseModel
+
+from lib.string import String
+from lib.module import Module
 
 
 class Code:

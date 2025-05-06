@@ -1,4 +1,4 @@
-from dapi.lib.string import String
+from lib.string import String
 
 
 class Highlight:

@@ -1,6 +1,5 @@
-import os
-import importlib.util
-import inspect
+import os, inspect
+import importlib.util, importlib
 from pathlib import Path
 from typing  import Type
 
@@ -132,3 +131,10 @@ class Module:
 				registry[name] = cls
 
 		return registry
+
+	def get_module_text(module_name):
+		module = importlib.import_module(module_name)
+		path   = inspect.getfile(module)
+
+		with open(path, 'r', encoding='utf-8') as f:
+			return f.read()

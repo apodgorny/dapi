@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from typing      import Optional
 
-from dapi.lib    import O
+from lib         import O
 from .psychology import Personality, Trauma, Duality
 from .persona    import Persona
 

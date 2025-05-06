@@ -1,5 +1,5 @@
-from dapi.lib.string    import String
-from dapi.lib.highlight import Highlight
+from lib.string    import String
+from lib.highlight import Highlight
 
 class Frame:
 	def __init__(

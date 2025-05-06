@@ -2,7 +2,7 @@ import json
 import asyncio
 from openai import OpenAI
 
-from dapi.lib import Model
+from lib import Model
 
 
 class ModelOpenai(Model):

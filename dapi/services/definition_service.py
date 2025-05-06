@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from lib import DapiException, DapiService, is_reserved, Module, String, Operator
+
 from dapi.db      import OperatorRecord
 from dapi.schemas import OperatorSchema
-from dapi.lib     import DapiException, DapiService, is_reserved, Module, String, Operator
 
 
 OPERATOR_DIR = os.path.join(

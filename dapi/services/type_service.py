@@ -1,12 +1,12 @@
 from __future__    import annotations
 
 import json
-
 from typing        import Any, Dict, List, Optional
+
+from lib           import DapiService, DapiException, O, jscpy
 
 from dapi.db       import TypeRecord
 from dapi.schemas  import TypeSchema
-from dapi.lib      import DapiService, DapiException, O, jscpy
 
 
 @DapiService.wrap_exceptions()

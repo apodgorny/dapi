@@ -1,7 +1,7 @@
 from pydantic             import BaseModel
 from typing               import List, Dict, Any
 
-from wordwield.wordwield  import (
+from lib import (
 	Operator,
 	Agent,
 	AgentOnGrid,

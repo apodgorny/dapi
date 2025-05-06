@@ -8,7 +8,7 @@ import jsonschema
 from typing     import get_args, get_origin, List, Dict, Any, Self
 from pydantic   import BaseModel, ValidationError, create_model
 
-from lib.jscpy import jscpy
+from .jscpy import jscpy
 
 
 class DatumError(Exception):

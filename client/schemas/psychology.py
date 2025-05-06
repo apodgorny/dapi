@@ -1,4 +1,4 @@
-from dapi.lib import O
+from lib import O
 
 
 class Resource(O):

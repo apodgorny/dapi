@@ -4,8 +4,7 @@ import random, builtins
 from typing       import Any, Dict, List, Optional
 from pydantic     import BaseModel
 
-from dapi.schemas import OperatorSchema
-from dapi.lib     import (
+from lib     import (
 	DapiException,
 	DapiService,
 	ExecutionContext,
@@ -17,6 +16,7 @@ from dapi.lib     import (
 	Agent,
 	AgentOnGrid
 )
+from dapi.schemas import OperatorSchema
 
 
 @DapiService.wrap_exceptions()

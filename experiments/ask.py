@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from dapi.lib import Operator, Model
+from lib import Operator, Model
 
 
 class Ask(Operator):

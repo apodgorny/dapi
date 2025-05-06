@@ -1,9 +1,9 @@
 from typing import Callable
 
-from dapi.lib.datum             import Datum
-from dapi.lib.string            import String
-from dapi.lib.autoargs          import autodecorate
-from dapi.lib.execution_context import ExecutionContext
+from lib.datum             import Datum
+from lib.string            import String
+from lib.autoargs          import autodecorate
+from lib.execution_context import ExecutionContext
 
 
 class Operator:

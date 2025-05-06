@@ -19,3 +19,5 @@ from .reserved          import is_reserved
 from .autoargs          import autoargs, autodecorate
 
 from .jscpy             import jscpy, Jscpy
+
+from .wordwield         import WordWield

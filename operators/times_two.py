@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from dapi.lib.operator import Operator
+from pydantic     import BaseModel
+from lib.operator import Operator
 
 
 class TimesTwo(Operator):

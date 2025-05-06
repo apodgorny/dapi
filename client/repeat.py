@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from pydantic import BaseModel
 from typing   import List, Dict, Any, Optional
 
-from wordwield.wordwield import Operator, WordWield as ww
+from lib import Operator, WordWield as ww
 
 
 ################################################################

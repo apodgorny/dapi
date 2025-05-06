@@ -10,7 +10,7 @@ from pydantic        import BaseModel
 
 from dapi.db         import OperatorRecord
 from dapi.schemas    import OperatorSchema
-from dapi.lib        import (
+from lib        import (
 	String,
 	Datum,
 	DapiService,

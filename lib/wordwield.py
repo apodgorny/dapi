@@ -3,10 +3,7 @@ import os, sys, inspect, httpx, ast, json
 from pathlib    import Path
 from pydantic   import BaseModel
 
-from .string    import String
-from .highlight import Highlight
-
-from dapi.lib   import Operator, Agent, AgentOnGrid, Datum, O
+from lib import String, Highlight, Operator, Agent, AgentOnGrid, Datum, O
 
 
 PROJECT_PATH = os.environ.get('PROJECT_PATH')
@@ -109,7 +106,7 @@ class Code:
 
 
 class WordWield:
-	VERBOSE = False
+	VERBOSE = True
 
 	# Private methods
 	############################################################################
@@ -177,7 +174,7 @@ class WordWield:
 	############################################################################
 
 	@staticmethod
-	def init():
+	def init(scope):
 		'''Create all Operator and O-descendant types defined in the caller scope.'''
 		frame     = inspect.currentframe().f_back
 		module    = inspect.getmodule(frame)
@@ -211,7 +208,10 @@ class WordWield:
 	def error(severity, message):
 		if not WordWield.VERBOSE:
 			return
-		prefix = String.color(severity.upper() + ':', WordWield._color(severity))
+		try:
+			prefix = String.color(severity.upper() + ':', WordWield._color(severity))
+		except:
+			prefix = severity.upper() + ':'
 		message = str(message).replace('\n', '\n')
 		WordWield.print(f'{prefix} {message}')
 
@@ -223,11 +223,11 @@ class WordWield:
 		if WordWield.VERBOSE:
 			bar = f'  {"- " * 22}'
 			WordWield.print('\n' + ('-' * 45))
-			WordWield.print(String.underlined(f'Calling `{path}`'))
+			# WordWield.print(String.underlined(f'Calling `{path}`'))
 			if 'json' in kwargs:
-				WordWield.print(f'\n{bar}', color=String.DARK_GRAY)
+				# WordWield.print(f'\n{bar}', color=String.DARK_GRAY)
 				for key, val in kwargs['json'].items():
-					WordWield.print(f'  {key:<16}{String.color(":", String.GRAY)} ', end='')
+					# WordWield.print(f'  {key:<16}{String.color(":", String.GRAY)} ', end='')
 					if isinstance(val, dict):
 						val = json.dumps(val, indent=2, ensure_ascii=False)
 						val = Highlight.python(val)
@@ -249,71 +249,11 @@ class WordWield:
 			if trace:
 				WordWield.print(String.color(trace, String.GRAY))
 			if severity == 'halt':
-				exit(1)
+				raise
+
 		except Exception as e:
-			WordWield.error('halt', str(e))
-			exit(1)
-
-	# @staticmethod
-	# def invoke(operator: Operator, *args, **kwargs):
-	# 	name = String.camel_to_snake(operator.__name__)
-	# 	if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
-	# 		input_data = args[0]
-	# 	else:
-	# 		input_data = kwargs
-
-	# 	result = WordWield.request('POST', f'{name}', json=input_data)
-	# 	result = result['output']
-	# 	WordWield.success(f'Invoked operator `{name}`:\n')
-	# 	WordWield.print(Highlight.python(json.dumps(result, ensure_ascii=False, indent=4)))
-
-	# 	if isinstance(result, dict) and hasattr(operator, 'OutputType') and issubclass(operator.OutputType, O):
-	# 		return operator.OutputType.from_dict(result)
-
-	# 	result = tuple(result[k] for k in result)
-	# 	if len(result) == 1:
-	# 		result = result[0]
-	# 	return result
-
-	# @staticmethod
-	# def invoke(operator: Operator, *args, **kwargs):
-	# 	name = String.camel_to_snake(operator.__name__)
-	# 	if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
-	# 		input_data = args[0]
-	# 	else:
-	# 		input_data = kwargs
-
-	# 	# ✅ Рекурсивно сериализуем все O-модели
-	# 	def serialize(value):
-	# 		if isinstance(value, O):
-	# 			return {
-	# 				k: serialize(v)
-	# 				for k, v in value.model_dump().items()
-	# 			}
-	# 		elif isinstance(value, list):
-	# 			return [serialize(i) for i in value]
-	# 		elif isinstance(value, dict):
-	# 			return {k: serialize(v) for k, v in value.items()}
-	# 		else:
-	# 			return value
-
-	# 	input_data = serialize(input_data)
-
-	# 	result = WordWield.request('POST', f'{name}', json=input_data)
-	# 	result = result['output']
-
-	# 	WordWield.success(f'Invoked operator `{name}`:\n')
-	# 	WordWield.print(Highlight.python(json.dumps(result, ensure_ascii=False, indent=4)))
-
-	# 	# ✅ Автовозврат модели, если OutputType указан
-	# 	if isinstance(result, dict) and hasattr(operator, 'OutputType') and issubclass(operator.OutputType, O):
-	# 		return operator.OutputType.from_dict(result)
-
-	# 	# ✅ Распаковка
-	# 	result = tuple(result[k] for k in result)
-	# 	if len(result) == 1:
-	# 		result = result[0]
-	# 	return result
+			# WordWield.error('halt', str(e))
+			raise
 
 	@staticmethod
 	def invoke(operator: Operator, *args, **kwargs):

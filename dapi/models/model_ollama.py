@@ -5,7 +5,7 @@ import asyncio
 import ollama
 from pydantic import BaseModel
 
-from dapi.lib import Model
+from lib import Model
 
 
 class ModelOllama(Model):
