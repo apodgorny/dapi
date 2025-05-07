@@ -5,3 +5,5 @@ from .interpretations import Interpretations
 from .antagonist      import Antagonist
 from .protogonist     import Protogonist
 from .psychologist    import Psychologist, Traumatologist, Dualist, Personalizer
+from .reader          import Reader
+from .writer          import Writer

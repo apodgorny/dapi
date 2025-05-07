@@ -25,6 +25,12 @@ class Agent(Operator):
 		schema = schema or self.OutputType
 		if output_repr:
 			prompt = prompt + '\nPut all data into JSON:\n' + schema.prompt()
+
+		print('-'*30)
+		print(f'Agent `{self.__class__.__name__}`')
+		print(prompt)
+		print('-'*30)
+
 		return await self.globals['ask'](
 			prompt          = prompt,
 			response_schema = schema  # BaseModel

@@ -105,7 +105,8 @@ class Code:
 
 
 class WordWield:
-	VERBOSE = True
+	verbose        = True
+	is_initialized = False
 
 	# Private methods
 	############################################################################
@@ -172,10 +173,10 @@ class WordWield:
 	# Public methods
 	############################################################################
 
-	@staticmethod
-	def init():
+	@classmethod
+	def init(cls):
 		'''Create all Operator and O-descendant types defined in the caller scope.'''
-		frame     = inspect.currentframe().f_back
+		frame     = inspect.currentframe().f_back.f_back
 		module    = inspect.getmodule(frame)
 		objects   = vars(sys.modules[module.__name__])
 
@@ -189,6 +190,8 @@ class WordWield:
 		for op_def in operators:
 			WordWield._create_operator(op_def)
 
+		cls.is_initialized = True
+
 	@staticmethod
 	def print(*args, **kwargs):
 		kwargs['flush'] = True
@@ -199,13 +202,13 @@ class WordWield:
 
 	@staticmethod
 	def success(message):
-		if WordWield.VERBOSE:
+		if WordWield.verbose:
 			prefix = String.color('SUCCESS:', String.LIGHTGREEN)
 			WordWield.print(f'{prefix} {message}')
 
 	@staticmethod
 	def error(severity, message):
-		if not WordWield.VERBOSE:
+		if not WordWield.verbose:
 			return
 		try:
 			prefix = String.color(severity.upper() + ':', WordWield._color(severity))
@@ -219,7 +222,7 @@ class WordWield:
 		url = f'{DAPI_URL}/{path.lstrip("/")}'
 		kwargs.setdefault('timeout', 1200.0)
 
-		if WordWield.VERBOSE:
+		if WordWield.verbose:
 			bar = f'  {"- " * 22}'
 			WordWield.print('\n' + ('-' * 45))
 			# WordWield.print(String.underlined(f'Calling `{path}`'))
@@ -254,8 +257,11 @@ class WordWield:
 			# WordWield.error('halt', str(e))
 			raise
 
-	@staticmethod
-	def invoke(operator: Operator, *args, **kwargs):
+	@classmethod
+	def invoke(cls, operator: Operator, *args, **kwargs):
+		if not cls.is_initialized:
+			cls.init()
+
 		name = String.camel_to_snake(operator.__name__)
 
 		if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
@@ -285,11 +291,11 @@ class WordWield:
 			raise TypeError(f'OutputType of {operator.__name__} must be subclass of `BaseModel`')
 
 		# 🌐 Request and parse response
-		result_dict = WordWield.request('POST', f'{name}', json=input_data)['output']
+		result_dict = cls.request('POST', f'{name}', json=input_data)['output']
 
 		# 📎 Show result
-		WordWield.success(f'Invoked operator `{name}`:\n')
-		WordWield.print(Highlight.python(json.dumps(result_dict, ensure_ascii=False, indent=4)))
+		cls.success(f'Invoked operator `{name}`:\n')
+		cls.print(Highlight.python(json.dumps(result_dict, ensure_ascii=False, indent=4)))
 
 		# 📦 Convert to model
 		output_model = OutputType.model_validate(result_dict)

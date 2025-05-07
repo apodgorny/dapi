@@ -21,13 +21,13 @@ class Interpretations(Agent):
 	class Interpretations(O):
 		items: list[str]
 
-	prompt = '''
+	template = '''
 		Создай {{spread}} интерпретаций заголовка "{{title}}" в стиле "{{theme}}", 3-4 слова каждый.
 	'''
 
 	async def invoke(self, title, theme, spread=10):
 		prompt = self.fill(
-			self.prompt,
+			self.template,
 			title  = title,
 			theme  = theme,
 			spread = spread
@@ -36,6 +36,4 @@ class Interpretations(Agent):
 			prompt,
 			schema = self.Interpretations
 		)
-		print(prompt)
-		print(interpretations)
 		return random.choice(interpretations)
