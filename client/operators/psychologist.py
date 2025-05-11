@@ -10,18 +10,18 @@ from lib import (
 	Agent
 )
 from client.schemas import (
-	Persona,
+	PersonaSchema,
 	Personality,
 	Trauma,
 	Duality,
 	Subpersonality,
-	Character
+	CharacterSchema
 )
 
 
 class Traumatologist(Agent):
 	class InputType(O):
-		persona     : Persona
+		persona     : PersonaSchema
 		complexity  : int
 
 	class OutputType(O):
@@ -65,7 +65,7 @@ class Traumatologist(Agent):
 
 class Dualist(Agent):
 	class InputType(O):
-		persona  : Persona
+		persona  : PersonaSchema
 		trauma   : Trauma
 
 	class OutputType(O):
@@ -154,11 +154,11 @@ class Personalizer(Agent):
 
 class Psychologist(Agent):
 	class InputType(O):
-		persona     : Persona
+		persona     : PersonaSchema
 		complexity  : int
 
 	class OutputType(O):
-		character: Character
+		character: CharacterSchema
 
 	async def invoke(self, persona, complexity):
 		dualities = []
@@ -170,7 +170,7 @@ class Psychologist(Agent):
 
 		personality = await personalizer(dualities=dualities)
 
-		return Character(
+		return CharacterSchema(
 			persona     = persona,
 			personality = personality,
 			traumas     = traumas,

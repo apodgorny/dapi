@@ -1,5 +1,7 @@
-from .persona    import Persona
-from .character  import Character
+from .persona_schema    import PersonaSchema
+from .character_schema  import CharacterSchema
+from .location_schema   import LocationSchema
+from .story_schema      import StorySchema
 from .psychology import (
 	Personality,
 	Duality,
@@ -11,5 +13,5 @@ from .psychology import (
 	Trauma,
 	TraumaAttributes,
 	TraumaComponents,
-	TraumaCoping
+	TraumaCoping,
 )

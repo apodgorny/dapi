@@ -34,31 +34,31 @@ class O(BaseModel):
 		}
 		return json.dumps(result, indent=4, ensure_ascii=False)
 
-	def walk(self, f):
-		def visit(val: Any, path: list[str], hint: Any = None):
-			desc = None
-			if isinstance(val, BaseModel) and path:
-				field = val.__class__.model_fields.get(path[-1])
-				if field:
-					desc = field.description
+	# def walk(self, f):
+	# 	def visit(val: Any, path: list[str], hint: Any = None):
+	# 		desc = None
+	# 		if isinstance(val, BaseModel) and path:
+	# 			field = val.__class__.model_fields.get(path[-1])
+	# 			if field:
+	# 				desc = field.description
 
-			f(path, type(val), val, desc)
+	# 		f(path, type(val), val, desc)
 
-			if isinstance(val, BaseModel):
-				for name, field in val.model_fields.items():
-					visit(getattr(val, name), path + [name], field.annotation)
+	# 		if isinstance(val, BaseModel):
+	# 			for name, field in val.model_fields.items():
+	# 				visit(getattr(val, name), path + [name], field.annotation)
 
-			elif isinstance(val, list):
-				item_type = get_args(hint)[0] if hint else None
-				for i, item in enumerate(val):
-					visit(item, path + [str(i)], item_type)
+	# 		elif isinstance(val, list):
+	# 			item_type = get_args(hint)[0] if hint else None
+	# 			for i, item in enumerate(val):
+	# 				visit(item, path + [str(i)], item_type)
 
-			elif isinstance(val, dict):
-				val_type = get_args(hint)[1] if hint and len(get_args(hint)) == 2 else None
-				for k, v in val.items():
-					visit(v, path + [str(k)], val_type)
+	# 		elif isinstance(val, dict):
+	# 			val_type = get_args(hint)[1] if hint and len(get_args(hint)) == 2 else None
+	# 			for k, v in val.items():
+	# 				visit(v, path + [str(k)], val_type)
 
-		visit(self, [])
+	# 	visit(self, [])
 
 	@classmethod
 	def prompt(cls) -> str:

@@ -1,5 +1,5 @@
 
-import os, sys
+import os, sys, json
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from pydantic             import BaseModel
@@ -7,40 +7,42 @@ from typing               import List, Dict, Any
 
 from lib import (
 	O,
-	Operator,
 	Agent,
-	AgentOnGrid,
+	String
 )
 
 # Import from client.schemas package
-from client.schemas import Persona
+from client.schemas import PersonaSchema
 
 
 class Protogonist(Agent):
 	class InputType(O):
-		title : str
-		idea  : str
-		theme : str
+		story_id : str
 
 	class OutputType(O):
-		persona: Persona
+		persona: PersonaSchema
 
 	template = '''
-		Ты писатель. Пишешь книгу под названием "{{title}}".
-		Идея книги: "{{idea}}".
-		Извлеки главного персонажа из идеи.
-		Персонаж должен хорошо вписываться в жанр {{theme}}.
+		Ты талантливый писатель. Вот данные о книге, которую ты пишешь.
+		------
+		{{story}}
+		------
+		Извлеки главного персонажа.
+		Персонаж должен хорошо вписываться в жанр книги.
 		Используй русские имена.
 		Создай имя соответствующее полу.
 		Прояви креативность.
+		Спасибо.
 	'''
 
-	async def invoke(self, title, idea, theme):
-		print(Persona, builtins.type(Persona))
+	async def invoke(self, story_id):
+		story_data = await read_json(f'story.{story_id}.json')
 		prompt = self.fill(
 			self.template,
-			title = title,
-			idea  = idea,
-			theme = theme
+			story = json.dumps(story_data)
 		)
-		return await self.ask(prompt=prompt)
+		data = await self.ask(prompt=prompt)
+		id   = String.slugify(data['name'])
+		data['id'] = id
+		await write_json(f'character.{id}.json', data)
+		return data

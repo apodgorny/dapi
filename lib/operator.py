@@ -47,6 +47,8 @@ class Operator:
 		):
 			raise TypeError(f'OutputType of operator `{self.__class__.__name__}` must be a class subclassing O')
 
+	async def call(self, name, **kwargs):
+		return await self.globals['call'](name, *[], **kwargs)
 
 	async def invoke(self) -> Datum:
 		'''Execute operator and return output Datum.'''

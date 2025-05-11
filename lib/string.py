@@ -1,4 +1,4 @@
-import re
+import re, unicodedata
 
 
 class String:
@@ -31,6 +31,25 @@ class String:
 	LIGHTWHITE    = '\033[97m'
 	LIGHTGRAY     = GRAY  # alias
 	DARK_GRAY     = '\033[38;5;235m'
+
+	@staticmethod
+	def slugify(
+		text          : str,
+		transliterate : bool = False,
+		separator     : str  = '-'
+	) -> str:
+		'''
+		Convert string to a lowercase slug with a custom separator.
+		Optionally transliterate to ASCII.
+		'''
+		if transliterate:
+			text = unicodedata.normalize('NFKD', text)
+			text = text.encode('ascii', 'ignore').decode('ascii')
+
+		text = text.lower()
+		text = re.sub(r'[^\w\s-]', '', text)
+		text = re.sub(r'[\s_]+', separator, text)
+		return text.strip(separator)
 
 	@staticmethod
 	def indent(text: str, prefix: str = '\t') -> str:

@@ -53,14 +53,14 @@ if __name__ == '__main__':
 	protogonist_persona    = ww.invoke(Protogonist, title=topic, idea=idea, theme=theme)
 	print('protogonist_persona', type(protogonist_persona), protogonist_persona)
 	# antagonist    = ww.invoke(Antagonist,      title=topic, idea=idea, theme=theme, character=protogonist)
-	protogonist_character  = ww.invoke(Psychologist, complexity=1, persona=protogonist_persona)
+	# protogonist_character  = ww.invoke(Psychologist, complexity=1, persona=protogonist_persona)
 
 	print('title', initial_topic)
 	print('theme', theme)
 	print('topic', topic)
 	print('idea',  idea)
 
-	protogonist_character.to_disk(os.path.join(DATA_PATH, 'protogonist.json'))
+	# protogonist_character.to_disk(os.path.join(DATA_PATH, 'protogonist.json'))
 	print(protogonist_character)
 	# print('antagonist', antagonist)
 	

@@ -1,16 +1,19 @@
 from __future__ import annotations
+import json, aiofiles
 
 import random, builtins
-from typing       import Any, Dict, List, Optional
-from pydantic     import BaseModel
 
-from lib     import (
+from typing   import Any, Dict, List, Optional
+from pydantic import BaseModel
+
+from lib import (
 	DapiException,
 	DapiService,
 	ExecutionContext,
 	Python,
 	Datum,
 	Model,
+	String,
 
 	O,
 	Operator,
@@ -34,12 +37,16 @@ class RuntimeService(DapiService):
 
 			'O'           : O,
 			'Datum'       : Datum,
+			'String'      : String,
+			
 			'BaseModel'   : BaseModel,
 			'print'       : print,
 			'len'         : len,
 			'type'        : type,
 			'isinstance'  : isinstance,
 			'random'      : random,
+			'json'        : json,
+			'aiofiles'    : aiofiles,
 
 			'list'        : list,
 			'dict'        : dict,

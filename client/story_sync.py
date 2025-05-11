@@ -11,18 +11,20 @@ DATA_DIR = os.environ.get('DATA_DIR')
 
 # Use absolute imports to avoid issues when running script directly
 from client.schemas import (
-	Persona,
+	PersonaSchema,
 	Trauma,
 	Authority,
 	Duality,
 	PodgornySquare,
 	Personality,
 	Subpersonality,
-	Character
+	CharacterSchema,
+	StorySchema,
+	LocationSchema
 )
 from client.operators import (
 	Idea,
-	Interpretations,
+	Variations,
 
 	Protogonist,
 	Antagonist,
@@ -32,7 +34,9 @@ from client.operators import (
 	Personalizer,
 	Psychologist,
 	Reader,
-	Writer
+	Writer,
+	Story,
+	Locations
 )
 
 from lib import WordWield as ww
@@ -42,41 +46,28 @@ from lib import WordWield as ww
 
 if __name__ == '__main__':
 
-	initial_topic = 'Муха'
+	title         = 'Муха'
 	genre         = 'Комедия'
-	n_questions   = 3
+	variations    = 11
+	locations     = 3
 
-	topic = ww.invoke(
-		Interpretations,
-		title  = initial_topic,
-		theme  = genre,
-		spread = 10
-	)
-	idea = ww.invoke(
-		Idea,
-		topic = topic,
-		theme = genre
-	)
-	questions = ww.invoke(
-		Reader,
-		idea   = idea,
-		spread = n_questions
-	)
-	answers = ww.invoke(
-		Writer,
-		title     = topic,
-		genre     = genre,
-		idea      = idea,
-		questions = questions,
-		spread    = 3
+	story = ww.invoke(
+		Story,
+		title      = title,
+		genre      = genre,
+		variations = variations,
+		locations  = locations
 	)
 
+	protogonist = ww.invoke(
+		Protogonist,
+		story_id = story.id
+	)
+	antagonist = ww.invoke(
+		Antagonist,
+		story_id     = story.id,
+		character_id = protogonist.id
+	)
+
+	print('names', protogonist.name, antagonist.name)
 	print('IDEA:', idea)
-
-	for n in range(n_questions):
-		print('='*30)
-		print('QUESTION:', questions[n])
-		print('ANSWER:', answers[n])
-
-	
-	# questions = ww.invoke(Reader, idea=idea)
