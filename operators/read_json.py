@@ -22,5 +22,6 @@ class ReadJson(Operator):
 		async with aiofiles.open(filepath, 'r', encoding='utf-8') as f:
 			content = await f.read()
 			data    = json.loads(content)
+		print(type(data))
 		return data
 

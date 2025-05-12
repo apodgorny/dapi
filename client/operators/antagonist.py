@@ -48,7 +48,7 @@ class Antagonist(Agent):
 
 	async def invoke(self, story_id, character_id):
 		story_data     = await read_json(f'story.{story_id}.json')
-		character_data = await read_json(f'character.{character_id}.json')
+		character_data = await read_json(f'persona.{character_id}.json')
 		prompt = self.fill(
 			self.template,
 			story     = json.dumps(story_data),
@@ -57,5 +57,5 @@ class Antagonist(Agent):
 		data = await self.ask(prompt=prompt)
 		id   = String.slugify(data['name'])
 		data['id'] = id
-		await write_json(f'character.{id}.json', data)
+		await write_json(f'persona.{id}.json', data)
 		return data

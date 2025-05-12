@@ -9,4 +9,5 @@ from .reader          import Reader
 from .writer          import Writer
 from .story           import Story
 from .locations       import Locations
+from .relations       import Relations
 # from .character       import Character

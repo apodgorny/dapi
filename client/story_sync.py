@@ -20,7 +20,9 @@ from client.schemas import (
 	Subpersonality,
 	CharacterSchema,
 	StorySchema,
-	LocationSchema
+	LocationSchema,
+	RelationsSchema,
+	RelationSchema
 )
 from client.operators import (
 	Idea,
@@ -36,7 +38,8 @@ from client.operators import (
 	Reader,
 	Writer,
 	Story,
-	Locations
+	Locations,
+	Relations
 )
 
 from lib import WordWield as ww
@@ -51,23 +54,33 @@ if __name__ == '__main__':
 	variations    = 11
 	locations     = 3
 
-	story = ww.invoke(
-		Story,
-		title      = title,
-		genre      = genre,
-		variations = variations,
-		locations  = locations
+	# story = ww.invoke(
+	# 	Story,
+	# 	title      = title,
+	# 	genre      = genre,
+	# 	variations = variations,
+	# 	locations  = locations
+	# )
+
+	# protogonist = ww.invoke(
+	# 	Protogonist,
+	# 	story_id = story.id
+	# )
+	# antagonist = ww.invoke(
+	# 	Antagonist,
+	# 	story_id     = story.id,
+	# 	character_id = protogonist.id
+	# )
+	# relations = ww.invoke(
+	# 	Relations,
+	# 	story_id      = story.id,
+	# 	character_ids = [protogonist.id, antagonist.id]
+	# )
+
+	relations = ww.invoke(
+		Relations,
+		story_id      = 'муха',
+		character_ids = ['елисей', 'аня-волкова']
 	)
 
-	protogonist = ww.invoke(
-		Protogonist,
-		story_id = story.id
-	)
-	antagonist = ww.invoke(
-		Antagonist,
-		story_id     = story.id,
-		character_id = protogonist.id
-	)
-
-	print('names', protogonist.name, antagonist.name)
-	print('IDEA:', idea)
+	

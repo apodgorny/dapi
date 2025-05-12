@@ -44,5 +44,5 @@ class Protogonist(Agent):
 		data = await self.ask(prompt=prompt)
 		id   = String.slugify(data['name'])
 		data['id'] = id
-		await write_json(f'character.{id}.json', data)
+		await write_json(f'persona.{id}.json', data)
 		return data

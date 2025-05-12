@@ -48,6 +48,6 @@ class Story(Operator):
 			idea      = story_idea,
 			locations = story_locations
 		)
-		await write_json(f'story.{id}.json', data.to_dict())
+		foo = await write_json(f'story.{id}.json', data.to_dict())
 		return data
 

@@ -1,4 +1,4 @@
-import re
+import re, json
 
 from .operator import Operator
 from .string   import String
@@ -18,7 +18,16 @@ class Agent(Operator):
 		for path in matches:
 			if path not in vars:
 				raise ValueError(f'[LLM] Field `{path}` mentioned in template, but not supplied')
-			template = template.replace(f'{{{{{path}}}}}', str(vars[path]))
+
+			value = vars[path]
+			# Automatically serialize dict or list as JSON
+			if isinstance(value, (dict, list)):
+				value = json.dumps(value, indent=4, ensure_ascii=False)
+			else:
+				value = str(value)
+
+			template = template.replace(f'{{{{{path}}}}}', value)
+
 		return template
 
 	async def ask(self, prompt = None, schema = None, output_repr=True):

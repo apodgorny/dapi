@@ -40,7 +40,7 @@ class Character(Agent):
 
 	async def invoke(self, name):
 		actions = 'думать чувствовать наблюдать говорить идти выражать делать'.split()
-		dossier = await read_json(f'character.{name.lower().replace(" ", "_")}.json')
+		dossier = await read_json(f'persona.{name.lower().replace(" ", "_")}.json')
 		story   = await read_json('story.json')
 		prompt  = self.fill(
 			self.t,
@@ -49,4 +49,4 @@ class Character(Agent):
 			beats   = story['beats']
 			** dossier
 		)
-		return self.ask(prompt)
+		return await self.ask(prompt)

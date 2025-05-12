@@ -36,7 +36,7 @@ class DivergeStory(Operator):
 	'''
 
 	def invoke(self, text):
-		return self.ask(text=text)
+		return await self.ask(text=text)
 
 
 ################################################################
@@ -60,7 +60,7 @@ class Idea(Operator):
 	'''
 
 	def invoke(self, topic):
-		return self.ask(topic=topic)
+		return await self.ask(topic=topic)
 
 
 ################################################################
@@ -106,7 +106,7 @@ class Planner(Operator):
 		spread      : str,
 		breadcrumbs : str
 	):
-		return self.ask(
+		return sawait elf.ask(
 			topic       = topic,
 			idea        = idea,
 			item        = item,

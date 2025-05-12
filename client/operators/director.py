@@ -49,4 +49,4 @@ class Character(Agent):
 			name  = name,
 			beats = story['beats'],
 		)
-		return self.ask(prompt)
+		return await self.ask(prompt)
