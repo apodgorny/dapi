@@ -2,10 +2,11 @@ import os, re
 
 from pydantic import BaseModel
 
-from .module         import Module
-from .datum          import Datum
-from .string         import String
-from .dapi_exception import DapiException
+from .module          import Module
+from .string          import String
+from .o               import O
+from .dapi_exception  import DapiException
+from .transformations import Transform
 
 PROJECT_PATH = os.environ.get('PROJECT_PATH')
 MODELS_DIR   = os.environ.get('MODELS_DIR')
@@ -50,38 +51,34 @@ class Model:
 	@classmethod
 	async def generate(
 		cls,
-		prompt          : str,
-		response_schema : dict,
+		
+		prompt         : str,
+		response_model : O,
 
-		model_id        : str        = 'ollama::gemma3:4b',
-		role            : str        = 'user',
-		temperature     : float      = 0.0,
-		system          : str | None = None
+		model_id       : str        = 'ollama::gemma3:4b',
+		role           : str        = 'user',
+		temperature    : float      = 0.0,
+		system         : str | None = None
 
 	) -> dict:
 		try:
-			if not isinstance(response_schema, type):
-				raise ValueError(f'Model.generate requires `response_schema` to be BaseModel, but received `{type(response_schema)}`')
+			if not issubclass(response_model, O):
+				raise ValueError(f'Model.generate requires `response_model` to be a subclass of `O`, but received `{type(response_model)}`')
 
-			model = Model.load(model_id)
-			response_json_schema = Datum(response_schema).to_dict(schema=True)
-
+			model  = Model.load(model_id)
 			result = await model(
 				prompt          = prompt,
-				response_schema = response_json_schema,
+				response_schema = response_model.to_schema(),
 				role            = role,
 				temperature     = temperature,
 				system          = system
 			)
 
-			# Validate output via Datum
-			Datum(response_schema).validate(result)
+			# Validate output
+			response_model(**result)
 
 			# Unpack to tuple of attributes or single value to match operator output convention
-			result = tuple(result[k] for k in result)
-			if len(result) == 1:
-				result = result[0]
-
+			result = Transform(Transform.DATA, Transform.ARGUMENTS, result)
 			return result
 
 		except Exception as e:

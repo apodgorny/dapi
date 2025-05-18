@@ -13,6 +13,11 @@ DATA_DIR = os.environ.get('DATA_DIR')
 from client.schemas import (
 	PersonaSchema,
 	Trauma,
+	TraumaAttributes,
+	TraumaComponents,
+	TraumaCoping,
+	Side,
+	Resource,
 	Authority,
 	Duality,
 	PodgornySquare,
@@ -44,7 +49,8 @@ from client.operators import (
 	Story,
 	Locations,
 	Relations,
-	Stage
+	Stage,
+	Chel
 )
 
 from lib import WordWield as ww
@@ -52,45 +58,28 @@ from lib import WordWield as ww
 
 ################################################################
 
-if __name__ == '__main__':
+beats = []
 
-	title         = 'Муха'
-	genre         = 'Комедия'
-	variations    = 11
-	locations     = 3
-
-	# story = ww.invoke(
-	# 	Story,
-	# 	title      = title,
-	# 	genre      = genre,
-	# 	variations = variations,
-	# 	locations  = locations
-	# )
-
-	# protogonist = ww.invoke(
-	# 	Protogonist,
-	# 	story_id = story.id
-	# )
-	# antagonist = ww.invoke(
-	# 	Antagonist,
-	# 	story_id     = story.id,
-	# 	character_id = protogonist.id
-	# )
-	# relations = ww.invoke(
-	# 	Relations,
-	# 	story_id      = story.id,
-	# 	character_ids = [protogonist.id, antagonist.id]
-	# )
-
-	# relations = ww.invoke(
-	# 	Relations,
-	# 	story_id      = 'муха',
-	# 	character_ids = ['елисей', 'аня-волкова']
-	# )
-
-	beats = ww.invoke(
-		Stage,
-		story_id      = 'муха',
-		character_ids = ['елисей', 'аня-волкова', 'сквозьглаз'],
-		iterations    = 3
+def handle_input(question, beats):
+	user_beat = BeatSchema(
+		character_id = 'Молодой человек',
+		speech       = question,
+		action       = ''
 	)
+	beats.append(user_beat)
+	chel_beat = ww.invoke(
+		Chel,
+		beats = '\n'.join([b.prompt() for b in beats])
+	)
+	beats.append(chel_beat)
+	return chel_beat 
+
+
+if __name__ == '__main__':
+	while True:
+		question = input('> ')
+		if question.strip().lower() == 'exit':
+			print('Goodbye!')
+			break
+		beat = handle_input(question, beats)
+		print('> ' + beat.speech + f'({beat.action})')

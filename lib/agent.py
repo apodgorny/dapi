@@ -1,7 +1,9 @@
 import re, json
 
-from .operator import Operator
-from .string   import String
+from .operator        import Operator
+from .o               import O
+from .string          import String
+from .transformations import Transform
 
 
 class Agent(Operator):
@@ -19,8 +21,9 @@ class Agent(Operator):
 			if path not in vars:
 				raise ValueError(f'[LLM] Field `{path}` mentioned in template, but not supplied')
 
-			value = vars[path]
-			# Automatically serialize dict or list as JSON
+			# Convert all pydantic/o objects in data into plain data
+			value = Transform(Transform.PYDANTIC, Transform.DATA, vars[path])
+
 			if isinstance(value, (dict, list)):
 				value = json.dumps(value, indent=4, ensure_ascii=False)
 			else:
@@ -41,6 +44,6 @@ class Agent(Operator):
 		print('-'*30)
 
 		return await self.globals['ask'](
-			prompt          = prompt,
-			response_schema = schema  # BaseModel
+			prompt         = prompt,
+			response_model = schema  # BaseModel
 		)

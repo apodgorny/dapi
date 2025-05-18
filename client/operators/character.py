@@ -1,52 +1,73 @@
 from lib import (
 	O,
 	Operator,
-	Agent
+	Agent,
+	Respin
+)
+from client.schemas import (
+	BeatSchema
 )
 
 
-class Character(Agent):
+class Character(Respin):
 	class InputType(O):
-		name : str
+		story_id     : str
+		character_id : str
+		beats        : list[BeatSchema]
 
 	class OutputType(O):
-		line : str
+		beat : BeatSchema
 
-	t = '''
-		Ты — {{name}}, {{sex}} в возрасте {{age}} лет.
-		Твоё занятие: {{occupation}}.
-		Твоё описание:
-		{{look}}. {{portrait}}
-		Твоя боль жизни: {{pain}}.
-		Твоё главное желание: {{desire}}.
-		Твоя роль: {{role}}.
-		Ты находишься в {{location}}.
-		Твоя долгосрочная цель: {{mission}}
-		Твоё текущее состояние: {{mood}}
+	class Templates:
+		spin_in = '''
+			Ты — {{name}}, {{sex}} в возрасте {{age}} лет.
+			Твоё занятие: {{occupation}}.
+			Твоё описание:
+			{{look}}. {{portrait}}
+			Твоя боль жизни: {{pain}}.
+			Твоё главное желание: {{desire}}.
+			Твоя долгосрочная цель: {{mission}}
+			
+			Недавние события:
+			{{beats}}
+		'''
+		spins = [
+			'''
+				Что произошло в "недавних событиях"?
+				Как ты можешь использовать их для достижения своих целей/желаний?
+				Ответь в 2-4 предложения.
+			''',
+			'''
+				Как ты можешь использовать ситуацию для достижения своих желаний и целей?
+				Начни с "Я хочу ..."
+				НЕ ПОВТОРЯЙ ВОПРОС,
+				ОТВЕТЬ В ОДНО ПРЕДЛОЖЕНИЕ.
+			'''
+		]
+		spin_out = '''
+			Скажи фразу и соверши действие, которое приблизит тебя к твоей цели и покажет твою силу или уязвимость.
+			Действие — физическое, провоцирующее, интимное или властное (например: прикоснуться, приблизиться, оттолкнуть, поцеловать, передвинуть предмет).
+			Отвечай на фразы/действия обращенные к тебе. Не предлагай действие - действуй фразой.
+			
+			Фраза — короткая, дерзкая или провокационная.
+			Действие — смелое и однозначное.
 
-		Отношения с другими:
-		{{relationships}}
+			НЕ ПОВТОРЯЙ ВОПРОС.
+			НЕ ОПИСЫВАЙ ДЕЙСТВИЯ ДРУГИХ ПЕРСОНАЖЕЙ
+		'''
 
-		Недавние события:
-		{{beats}}
+	async def invoke(self, story_id, character_id, beats):
+		dossier = await read_json(f'persona.{character_id}.json')
+		story   = await read_json(f'story.{story_id}.json')
+		data    = { **dossier, **story }
 
-		Доступные действия: {{actions}}
-		Ты можешь ничего не предпринимать — или выбрать два действия.
-
-		Всегда оставайся верен своей природе. Реагируй так, как требует твоя цель и внутреннее состояние.
-		Ответь одной-двумя фразами, как если бы ты писал своё действие в сценический скрипт.
-		Оставь тишину, в которую смогут войти другие.
-	'''
-
-	async def invoke(self, name):
-		actions = 'думать чувствовать наблюдать говорить идти выражать делать'.split()
-		dossier = await read_json(f'persona.{name.lower().replace(" ", "_")}.json')
-		story   = await read_json('story.json')
-		prompt  = self.fill(
-			self.t,
-			name    = name,
-			actions = actions,
-			beats   = story['beats']
-			** dossier
+		line = await self.spin(
+			verbose = True,
+			beats = beats,
+			** data,
 		)
-		return await self.ask(prompt)
+		return BeatSchema(
+			character_id = character_id,
+			line         = line
+		)
+	 

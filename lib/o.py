@@ -1,15 +1,31 @@
 import os, json
 from typing   import Any, get_args, get_origin, Union, List, Dict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .jscpy   import jscpy
+from .transformations import Transform
 
 
 class O(BaseModel):
 	# @classmethod
 	# def Field(cls, *args, **kwargs):
 	# 	return Field(*args, **kwargs)
+
+	@model_validator(mode='before')
+	@classmethod
+	def convert_nested_o(cls, data):
+		'''Recursively convert any O instances inside any fields to dicts.'''
+		if isinstance(data, dict):
+			return {
+				k: (
+					v.to_dict() if isinstance(v, O) else
+					[vv.to_dict() if isinstance(vv, O) else vv for vv in v] if isinstance(v, list) else
+					v
+				)
+				for k, v in data.items()
+			}
+		return data
 
 	@classmethod
 	def Field(cls, *args, description=None, **kwargs):
@@ -20,45 +36,7 @@ class O(BaseModel):
 		return Field(*args, description=description, **kwargs)
 
 	def __str__(self) -> str:
-		'''Render current object values as JSON, including nested O structures.'''
-		def serialize(val):
-			if isinstance(val, O):
-				return json.loads(str(val))
-			elif isinstance(val, (list, tuple)):
-				return [serialize(i) for i in val]
-			return val
-
-		result = {
-			k: serialize(getattr(self, k))
-			for k in self.model_fields
-		}
-		return json.dumps(result, indent=4, ensure_ascii=False)
-
-	# def walk(self, f):
-	# 	def visit(val: Any, path: list[str], hint: Any = None):
-	# 		desc = None
-	# 		if isinstance(val, BaseModel) and path:
-	# 			field = val.__class__.model_fields.get(path[-1])
-	# 			if field:
-	# 				desc = field.description
-
-	# 		f(path, type(val), val, desc)
-
-	# 		if isinstance(val, BaseModel):
-	# 			for name, field in val.model_fields.items():
-	# 				visit(getattr(val, name), path + [name], field.annotation)
-
-	# 		elif isinstance(val, list):
-	# 			item_type = get_args(hint)[0] if hint else None
-	# 			for i, item in enumerate(val):
-	# 				visit(item, path + [str(i)], item_type)
-
-	# 		elif isinstance(val, dict):
-	# 			val_type = get_args(hint)[1] if hint and len(get_args(hint)) == 2 else None
-	# 			for k, v in val.items():
-	# 				visit(v, path + [str(k)], val_type)
-
-	# 	visit(self, [])
+		return json.dumps(self.to_dict(), indent=4, ensure_ascii=False)
 
 	@classmethod
 	def prompt(cls) -> str:
@@ -94,7 +72,7 @@ class O(BaseModel):
 					c_desc  = field.description
 					key_str = '  ' * (indent + 1) + f'"{name}": '
 					value   = render_type(field.annotation, indent + 1)
-					comment = f'  # {c_desc}' if c_desc else f'{outer_desc}'
+					comment = f'  # {c_desc}' if c_desc else f''
 					sub_lines.append(key_str + value + comment)
 				sub_lines.append('  ' * indent + '}')
 				return '\n'.join(sub_lines)
@@ -132,6 +110,17 @@ class O(BaseModel):
 		render(cls)
 		return '\n'.join(lines)
 
+	def to_log(self):
+		id_s = ''
+		s    = ''
+		for attr in self.__dict__:
+			if not attr.startswith('__'):
+				if id in attr.split('_'):
+					id_s = attr
+				else:
+					s += f'\n{attr}'
+		return f'{id_s}\n{"="*40}\n{s}'
+
 	@classmethod
 	def from_dict(cls, data: dict) -> 'O':
 		'''Create instance from dict, with nested O reconstruction.'''
@@ -158,24 +147,15 @@ class O(BaseModel):
 		return cls(**parsed)
 
 	def to_dict(self) -> dict:
-		'''Return deeply serialized dictionary, recursively converting nested O models.'''
-		def serialize(val):
-			if isinstance(val, O):
-				return val.to_dict()
-			if isinstance(val, (list, tuple)):
-				return [serialize(i) for i in val]
-			if isinstance(val, dict):
-				return {k: serialize(v) for k, v in val.items()}
-			return val
-
-		return {
-			k: serialize(getattr(self, k))
-			for k in self.model_fields
-		}
+		return Transform(Transform.PYDANTIC, Transform.DATA, self)
 
 	def to_json(self) -> str:
 		'''Return JSON string from deeply serialized dict.'''
 		return json.dumps(self.to_dict(), indent=4, ensure_ascii=False)
+
+	@classmethod
+	def to_schema(cls) -> dict:
+		return Transform(Transform.PYDANTIC, Transform.DEREFERENCED_JSONSCHEMA, cls)
 
 	def __str__(self) -> str:
 		'''Default string representation is JSON.'''

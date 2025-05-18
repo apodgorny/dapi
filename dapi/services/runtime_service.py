@@ -1,7 +1,5 @@
 from __future__ import annotations
-import json, aiofiles
-
-import random, builtins
+import random, json, aiofiles
 
 from typing   import Any, Dict, List, Optional
 from pydantic import BaseModel
@@ -18,7 +16,8 @@ from lib import (
 	O,
 	Operator,
 	Agent,
-	AgentOnGrid
+	AgentOnGrid,
+	Respin
 )
 from dapi.schemas import OperatorSchema
 
@@ -29,41 +28,21 @@ class RuntimeService(DapiService):
 
 	############################################################################
 
-	def _get_operator_globals(self, context=None):
+	def get_globals(self, context=None, type_classes=None):
 		operator_globals = {
 			'Operator'    : Operator,
 			'Agent'       : Agent,
 			'AgentOnGrid' : AgentOnGrid,
+			'Respin'      : Respin,
 
 			'O'           : O,
 			'Datum'       : Datum,
 			'String'      : String,
 			
 			'BaseModel'   : BaseModel,
-			'print'       : print,
-			'len'         : len,
-			'type'        : type,
-			'isinstance'  : isinstance,
 			'random'      : random,
 			'json'        : json,
 			'aiofiles'    : aiofiles,
-
-			'list'        : list,
-			'dict'        : dict,
-			'str'         : str,
-			'int'         : int,
-			'float'       : float,
-			'bool'        : bool,
-			'set'         : set,
-			'tuple'       : tuple,
-
-			'Dict'        : Dict,
-			'List'        : List,
-			'Optional'    : Optional,
-			'Any'         : Any,
-
-			'__builtins__': builtins,
-			'builtins'    : builtins,
 		}
 
 		#-----------------------------------------------------------------#
@@ -83,14 +62,14 @@ class RuntimeService(DapiService):
 		#-----------------------------------------------------------------#
 		async def _ask(
 			prompt,
-			response_schema,
+			response_model,
 
 			model_id    = 'ollama::gemma3:4b',
 			temperature = 0.0
 		):
 			return await Model.generate(
 				prompt          = prompt,
-				response_schema = response_schema,
+				response_model  = response_model,
 				model_id        = model_id,
 				temperature     = temperature
 			)
@@ -98,15 +77,17 @@ class RuntimeService(DapiService):
 		operator_globals['ask'] = _ask
 		#-----------------------------------------------------------------#
 
-		try:
-			type_classes = self.dapi.type_service.get_all_classes()
+		if type_classes:
 			operator_globals.update(type_classes)
-		except Exception as e:
-			raise DapiException.consume(e)
 
 		return operator_globals
 
 	############################################################################
+
+	async def get_registered_operator_names(self) -> set[str]:
+		'''Returns a set of all registered operator names.'''
+		operators = await self.dapi.definition_service.get_all()
+		return {op['name'] for op in operators}
 
 	async def call_external_operator(self, name: str, args: list, kwargs: dict, context: ExecutionContext) -> Any:
 		'''External operator call from interpreted code.'''
@@ -121,9 +102,11 @@ class RuntimeService(DapiService):
 
 		self.i = context.i
 
-		operator         = self.dapi.definition_service.require(name)
-		operator_globals = self._get_operator_globals(context)
-		output           = ''
+		registered_operators = await self.get_registered_operator_names()
+		type_classes         = await self.dapi.type_service.get_all(context)
+		operator_globals     = self.get_globals(context, type_classes)
+		operator             = self.dapi.definition_service.require(name)
+		output               = ''
 
 		try:
 			# Input is validated in sub-calls, but not in direct call.
@@ -138,17 +121,19 @@ class RuntimeService(DapiService):
 				detail      = str(input)
 			)
 			instance = Python(
-				operator_name          = name,
-				operator_class_name    = operator.class_name,
-				input_dict             = input,
-				code                   = operator.code,
 				execution_context      = context,
-				operator_globals       = operator_globals,
+				registered_operators   = registered_operators,
+				extra_globals          = operator_globals,
 				call_external_operator = self.call_external_operator,
 				restrict               = operator.restrict
 			)
 
-			result = await instance.invoke()
+			result = await instance.invoke(
+				operator_name          = name,
+				operator_class_name    = operator.class_name,
+				input_dict             = input,
+				code                   = operator.code
+			)
 			output = await self.get_output_dict(name, result)
 			return output
 

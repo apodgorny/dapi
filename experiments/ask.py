@@ -11,7 +11,7 @@ class Ask(Operator):
 	class InputType(BaseModel):
 		input           : dict
 		prompt          : str
-		response_schema : type[BaseModel]
+		response_model : type[BaseModel]
 		model_id        : str   = 'ollama::gemma3:4b'
 		temperature     : float = 0.0
 
@@ -21,7 +21,7 @@ class Ask(Operator):
 	async def invoke(self,
 		input,
 		prompt,
-		response_schema,
+		response_model,
 
 		model_id    = 'ollama::gemma3:4b',
 		temperature = 0.0
@@ -29,7 +29,7 @@ class Ask(Operator):
 		response = await Model.generate(
 			prompt          = prompt,
 			input           = input,
-			response_schema = response_schema,
+			response_model  = response_model,
 			model_id        = model_id,
 			temperature     = temperature
 		)

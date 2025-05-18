@@ -34,10 +34,10 @@
 		}
 	],
 	// 🛡️ Включаем Ruff с правилом RUF012
-	"python.linting.enabled": true,
-	"python.linting.ruffEnabled": true,
-	"python.linting.ruffArgs": [
-		"--select=RUF012"
-	],
-	"python.linting.ruffPath": "/Users/alexander/vnv/dapi/bin/ruff"
+	// "python.linting.enabled": true,
+	// "python.linting.ruffEnabled": true,
+	// "python.linting.ruffArgs": [
+	// 	"--select=RUF012"
+	// ],
+	// "python.linting.ruffPath": "/Users/alexander/vnv/dapi/bin/ruff"
 }

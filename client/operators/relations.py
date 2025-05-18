@@ -47,13 +47,13 @@ class Relations(Agent):
 
 		for char_id in character_ids:
 			char_data = await read_json(f'persona.{char_id}.json')
-			characters.append(char_data)
+			characters.append(PersonaSchema(**char_data))
 
 		relations = []
 
 		for relator in characters:
 			for relatee in characters:
-				if relator['id'] == relatee['id']:
+				if relator.id == relatee.id:
 					continue  # skip self
 
 				prompt = self.fill(
@@ -64,13 +64,16 @@ class Relations(Agent):
 				)
 
 				expression = await self.ask(prompt=prompt, schema=self.Expression)
+				relation   = RelationSchema(
+					relator_id = relator.id,
+					relatee_id = relatee.id,
+					expression = expression
+				)
 
-				relations.append({
-					'relator_id' : relator['id'],
-					'relatee_id' : relatee['id'],
-					'expression' : expression
-				})
-				result = {'relations' : relations }
-				await write_json(f'relations.{story_id}.json', result)
+				print(type(relation), relation)
+
+				relations.append(relation)
+				result = RelationsSchema(relations = relations)
+				await write_json(f'relations.{story_id}.json', result.to_dict())
 
 		return result

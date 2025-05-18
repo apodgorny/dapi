@@ -380,20 +380,29 @@ class Jscpy:
 
 # Helper function for easy use
 def jscpy(
-    schema     : Dict[str, Any],
-    base_class : BaseModel = BaseModel,
-    class_name : str = 'GeneratedModel'
+	schema               : Dict[str, Any],
+	base_class           : BaseModel = BaseModel,
+	class_name           : str = 'GeneratedModel',
+	register_in_globals  : Optional[dict] = None
 ) -> type:
-    '''
-    Convert a JSON Schema to a Pydantic model.
-    
-    Args:
-        schema: JSON Schema dictionary
-        base_class: Base class for the model (must inherit from BaseModel)
-        class_name: Name for the generated model class
-        
-    Returns:
-        A Pydantic model class
-    '''
-    converter = Jscpy(base_class=base_class)
-    return converter.convert(schema, class_name=class_name)
+	'''
+	Convert a JSON Schema to a Pydantic model with clean name and optional registration.
+
+	Args:
+		schema: JSON Schema dictionary
+		base_class: Base class for the model (must inherit from BaseModel)
+		class_name: Name for the generated model class
+		register_in_globals: Optional dict where to register the class (e.g. globals())
+
+	Returns:
+		A Pydantic model class with explicit __name__ set.
+	'''
+	converter = Jscpy(base_class=base_class)
+	model     = converter.convert(schema, class_name=class_name)
+	model.__name__ = class_name  # ✅ Чистое имя для repr(), str(), logs()
+
+	if register_in_globals is not None:
+		register_in_globals[class_name] = model  # ✅ Зарегистрировать в globals()
+
+	return model
+

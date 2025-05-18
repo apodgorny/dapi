@@ -1,37 +1,37 @@
 {
     "version": "0.2.0",
     "configurations": [{
-        "name": "▶ FastAPI (uvicorn)",
-        "type": "python",
-        "request": "launch",
-        "module": "uvicorn",
-        "args": [
+        "name"    : "▶ FastAPI (uvicorn)",
+        "type"    : "python",
+        "request" : "launch",
+        "module"  : "uvicorn",
+        "args"    : [
           "dapi.app:app",
           "--reload"
         ],
-        "jinja": true,
-        "justMyCode": true,
-        "console": "integratedTerminal",
-        "env": {
-          "PYTHONPATH": "${workspaceFolder}"
+        "jinja"      : true,
+        "justMyCode" : true,
+        "console"    : "integratedTerminal",
+        "env"        : {
+          "PYTHONPATH" : "${workspaceFolder}"
         }
     },{
-        "name": "▶ Client (WordWield)",
-        "type": "python",
-        "request": "launch",
-        "program": "${workspaceFolder}/processes/story_og.py",
-        "console": "integratedTerminal",
-        "justMyCode": true,
-        "env": {
-            "PYTHONPATH": "${workspaceFolder}"
+        "name"       : "▶ Client (WordWield)",
+        "type"       : "python",
+        "request"    : "launch",
+        "program"    : "${workspaceFolder}/processes/story_og.py",
+        "console"    : "integratedTerminal",
+        "justMyCode" : true,
+        "env"        : {
+            "PYTHONPATH" : "${workspaceFolder}"
         }
     },{
-        "name": "Attach to Client",
-        "type": "python",
-        "request": "attach",
-        "connect": {
-        "host": "localhost",
-        "port": 5678
+        "name"    : "Attach to Client",
+        "type"    : "python",
+        "request" : "attach",
+        "connect" : {
+        "host" : "localhost",
+        "port" : 5678
         }
     }]
   }

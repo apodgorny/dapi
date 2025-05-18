@@ -12,6 +12,7 @@ from .model             import Model
 from .operator          import Operator
 from .agent             import Agent
 from .agent_on_grid     import AgentOnGrid
+from .respin            import Respin
 
 from .execution_context import ExecutionContext
 

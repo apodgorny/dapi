@@ -3,7 +3,7 @@ from __future__    import annotations
 import json
 from typing        import Any, Dict, List, Optional
 
-from lib           import DapiService, DapiException, O, jscpy
+from lib           import DapiService, DapiException, O, Python
 
 from dapi.db       import TypeRecord
 from dapi.schemas  import TypeSchema
@@ -22,6 +22,7 @@ class TypeService(DapiService):
 		}
 
 	async def initialize(self):
+		self._type_cache = {}
 		await super().initialize()
 
 	async def create(self, schema: TypeSchema):
@@ -42,15 +43,51 @@ class TypeService(DapiService):
 
 		return schema
 
-	async def get(self, name: str) -> TypeSchema:
+	async def get(self, name, context) -> TypeSchema:
+		extra_globals = self.dapi.runtime_service.get_globals(context)
+		if name in self._type_cache:
+			return self._type_cache[name]
+
 		record = self.dapi.db.get(TypeRecord, name)
 		if not record:
-			raise DapiException.halt(f'Type `{name}` not found')
+			raise DapiException(
+				status_code = 404,
+				detail      = f'Type `{name}` not found',
+				severity    = 'halt'
+			)
+		try:
+			context.push(
+				name        = name,
+				lineno      = 1,
+				restrict    = True,
+				importance  = 1
+			)
+			interpreter = Python(
+				execution_context      = context,
+				registered_operators   = await self.dapi.runtime_service.get_registered_operator_names(),
+				extra_globals          = extra_globals,
+				call_external_operator = self.dapi.runtime_service.call_external_operator,
+				restrict               = True
+			)
+			loaded_type = await interpreter.eval_type(
+				code              = record.code,
+				class_name        = record.name,
+				get_external_type = self.get,
+				context           = context
+			)
+			self._type_cache[name] = loaded_type
+			return loaded_type
+		except Exception as e:
+			raise DapiException.consume(e)
+		finally:
+			context.pop()
 		return TypeSchema(**record.to_dict())
 
-	async def get_all(self) -> list[TypeSchema]:
-		records = self.dapi.db.query(TypeRecord).all()
-		return [TypeSchema(**r.to_dict()) for r in records]
+	async def get_all(self, context) -> list[TypeSchema]:
+		classes = {}
+		for (name,) in self.dapi.db.query(TypeRecord.name).all():
+			classes[name] = await self.get(name, context)
+		return classes		
 
 	async def delete(self, name: str):
 		record = self.dapi.db.get(TypeRecord, name)
@@ -61,23 +98,3 @@ class TypeService(DapiService):
 	async def delete_all(self):
 		self.dapi.db.query(TypeRecord).delete()
 		self.dapi.db.commit()
-
-	def get_class(self, name: str):
-		record = self.dapi.db.get(TypeRecord, name)
-		if not record:
-			raise DapiException.halt(f'Type `{name}` not found')
-
-		schema_dict = record.type_schema
-		model_cls   = jscpy(schema_dict, base_class=O)
-		return model_cls
-
-	def get_all_classes(self) -> dict[str, type]:
-		classes = {}
-		records = self.dapi.db.query(TypeRecord).all()
-		for r in records:
-			classes[r.name] = jscpy(r.type_schema, base_class=O)
-			# print('= '*20)
-			# print('---', r.name, '---')
-			# print(json.dumps(classes[r.name].model_json_schema(), indent=4))
-			# print('= '*20)
-		return classes
