@@ -2,14 +2,14 @@ from lib import (
 	O,
 	Operator,
 	Agent,
-	Respin
+	Spinner
 )
 from client.schemas import (
 	BeatSchema
 )
 
 
-class Character(Respin):
+class Character(Spinner):
 	class InputType(O):
 		story_id     : str
 		character_id : str

@@ -5,6 +5,7 @@
         "type"    : "python",
         "request" : "launch",
         "module"  : "uvicorn",
+        "python"  : "/Users/alexander/vnv/dapi/bin/python",
         "args"    : [
           "dapi.app:app",
           "--reload"

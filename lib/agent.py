@@ -34,16 +34,17 @@ class Agent(Operator):
 		return template
 
 	async def ask(self, prompt = None, schema = None, output_repr=True):
+		hr     = '-' * 40
 		schema = schema or self.OutputType
 		if output_repr:
-			prompt = prompt + '\nPut all data into JSON:\n' + schema.prompt()
+			prompt = prompt + '\nPut all data into JSON:\n' + schema.to_prompt()
 
-		print('-'*30)
-		print(f'Agent `{self.__class__.__name__}`')
-		print(prompt)
-		print('-'*30)
+		self.log('INPUT', prompt, hr)
 
-		return await self.globals['ask'](
+		output = await self.globals['ask'](
 			prompt         = prompt,
 			response_model = schema  # BaseModel
 		)
+
+		self.log('OUTPUT', output, hr)
+		return output

@@ -6,38 +6,5 @@
 	"python.testing.unittestEnabled": false,
 	"python.testing.pytestEnabled": true,
 	"debug.internalConsoleOptions": "neverOpen",
-	"makefile.configureOnOpen": false,
-	"folder-color.pathColors": [
-		{
-			"folderPath": "dapi/lib/",
-			"color": "foldercolorizer.color_ffff00"
-		},
-		{
-			"folderPath": "dapi/services/",
-			"color": "foldercolorizer.color_00cc99"
-		},
-		{
-			"folderPath": "dapi/interpreters/",
-			"color": "foldercolorizer.color_cc0099"
-		},
-		{
-			"folderPath": "dapi/operators/",
-			"color": "foldercolorizer.color_cc6600"
-		},
-		{
-			"folderPath": "dapi/processes/",
-			"color": "foldercolorizer.color_66ccff"
-		},
-		{
-			"folderPath": "dapi/client/",
-			"color": "foldercolorizer.color_ff99ff"
-		}
-	],
-	// 🛡️ Включаем Ruff с правилом RUF012
-	// "python.linting.enabled": true,
-	// "python.linting.ruffEnabled": true,
-	// "python.linting.ruffArgs": [
-	// 	"--select=RUF012"
-	// ],
-	// "python.linting.ruffPath": "/Users/alexander/vnv/dapi/bin/ruff"
+    "editor.bracketPairColorization.enabled": false,
 }

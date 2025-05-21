@@ -58,19 +58,27 @@ from lib import WordWield as ww
 
 ################################################################
 
-beats = []
+beats        = []
+character_id = 'Лиза'
+opponent_id  = 'Молодой человек'
+
 
 def handle_input(question, beats):
 	user_beat = BeatSchema(
-		character_id = 'Молодой человек',
+		character_id = opponent_id,
 		speech       = question,
 		action       = ''
 	)
 	beats.append(user_beat)
 	chel_beat = ww.invoke(
 		Chel,
-		beats = '\n'.join([b.prompt() for b in beats])
+		character_id = character_id,
+		opponent_id  = opponent_id,
+		beats        = [b.to_prompt() for b in beats],
+		description  = f'девушка {character_id}, 28 лет, красивая брюнетка, азартно заинтересованная в молодом человеке',
+		purpose      = 'сблизиться с ним и усилить флирт и интимное напряжение'
 	)
+	chel_beat.character_id = character_id
 	beats.append(chel_beat)
 	return chel_beat 
 

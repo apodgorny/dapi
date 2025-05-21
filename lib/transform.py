@@ -7,10 +7,10 @@ class _Transform:
 		self._registry : dict[str, dict[str, Callable]] = defaultdict(dict)
 		self._shapes   : dict[str, dict]                = {}
 
-	def __call__(self, from_shape: str, to_shape: str, thing: Any):
+	def __call__(self, from_shape: str, to_shape: str, thing: Any, *args):
 		steps = self._resolve_path(from_shape, to_shape)
 		for step in steps:
-			thing = step(thing)
+			thing = step(thing, *args)
 		return thing
 
 	def __getattr__(self, name: str):

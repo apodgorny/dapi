@@ -177,7 +177,7 @@ class Python:
 			if not operator_class:
 				raise ValueError(f'Class `{operator_class_name}` not found')
 
-			instance = operator_class(self.globals)
+			instance = operator_class(operator_name, self.globals)
 			invoke_method = getattr(instance, 'invoke', None)
 			if not invoke_method:
 				raise ValueError(f'Method `invoke` not found in `{operator_class_name}`')

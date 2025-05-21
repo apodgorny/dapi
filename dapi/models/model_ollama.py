@@ -66,11 +66,13 @@ class ModelOllama(Model):
 		if system:
 			params['messages'].insert(0, {'role': 'system', 'content': system})
 
-		response  = await asyncio.to_thread(self.client.chat, **params)
+		print('⏳ Calling ollama.chat...')
+		response = await asyncio.to_thread(self.client.chat, **params)
+		print('✅ ollama.chat returned!')
 		text      = response['message']['content']
-		# print('-' * 30)
-		# print('OUTPUT', text)
-		# print('-' * 30)
+		print('-' * 30)
+		print('OUTPUT', text)
+		print('-' * 30)
 		sanitized = self._sanitize_output(text)
 
 		return json.loads(sanitized)

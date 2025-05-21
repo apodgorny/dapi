@@ -14,4 +14,6 @@ from .locations       import Locations
 from .relations       import Relations
 from .stage           import Stage
 from .chel            import Chel
+from .evolve          import Evolve
+from .evolve1         import Evolve1
 # from .character       import Character

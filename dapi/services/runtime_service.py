@@ -17,7 +17,7 @@ from lib import (
 	Operator,
 	Agent,
 	AgentOnGrid,
-	Respin
+	Spinner
 )
 from dapi.schemas import OperatorSchema
 
@@ -33,7 +33,7 @@ class RuntimeService(DapiService):
 			'Operator'    : Operator,
 			'Agent'       : Agent,
 			'AgentOnGrid' : AgentOnGrid,
-			'Respin'      : Respin,
+			'Spinner'     : Spinner,
 
 			'O'           : O,
 			'Datum'       : Datum,
