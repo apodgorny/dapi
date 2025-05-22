@@ -12,7 +12,6 @@ from dapi.db         import OperatorRecord
 from dapi.schemas    import OperatorSchema
 from lib        import (
 	String,
-	Datum,
 	DapiService,
 	DapiException,
 	DatumSchemaError,
@@ -48,7 +47,6 @@ class OperatorService(DapiService):
 	def _get_operator_globals(self, context):
 		operator_globals = {
 			'Operator'   : Operator,
-			'Datum'      : Datum,
 			'BaseModel'  : BaseModel,
 			'print'      : print,
 			'len'        : len,

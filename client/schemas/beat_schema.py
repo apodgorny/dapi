@@ -14,7 +14,7 @@ class BeatSchema(O):
 	speech       : str = O.Field(description='Direct speech of character' )
 	action       : str = O.Field(description='Direct action of character. One sentence' )
 
-	def prompt(self):
+	def to_prompt(self):
 		name = ' '.join([w.capitalize() for w in self.character_id.split('-')])
 		return f'{name}: "{self.speech}"' + (f'[{self.action}]' if self.action else '')
 

@@ -37,7 +37,6 @@ class TypeService(DapiService):
 			name        = schema.name,
 			description = schema.description,
 			code        = schema.code,
-			type_schema = schema.type_schema
 		))
 		self.dapi.db.commit()
 

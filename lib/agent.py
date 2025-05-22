@@ -1,9 +1,9 @@
 import re, json
 
-from .operator        import Operator
-from .o               import O
-from .string          import String
-from .transformations import Transform
+from .operator  import Operator
+from .o         import O
+from .string    import String
+from .transform import T
 
 
 class Agent(Operator):
@@ -22,7 +22,7 @@ class Agent(Operator):
 				raise ValueError(f'[LLM] Field `{path}` mentioned in template, but not supplied')
 
 			# Convert all pydantic/o objects in data into plain data
-			value = Transform(Transform.PYDANTIC, Transform.DATA, vars[path])
+			value = T(T.PYDANTIC, T.DATA, vars[path])
 
 			if isinstance(value, (dict, list)):
 				value = json.dumps(value, indent=4, ensure_ascii=False)
@@ -37,7 +37,7 @@ class Agent(Operator):
 		hr     = '-' * 40
 		schema = schema or self.OutputType
 		if output_repr:
-			prompt = prompt + '\nPut all data into JSON:\n' + schema.to_prompt()
+			prompt = prompt + '\nPut all data into JSON:\n' + schema.to_schema_prompt()
 
 		self.log('INPUT', prompt, hr)
 

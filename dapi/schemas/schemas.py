@@ -22,10 +22,8 @@ class EmptySchema(BaseModel):
 
 class TypeSchema(BaseModel):
 	name        : str             = Field(...,                  description='Type name and class name (identical)')
-	type_schema : Dict[str, Any]  = Field(...,                  description='Serialized Pydantic schema of the type')
 	code        : str             = Field(...,                  description='Python code that defines the type')
 	description : str             = Field('',                   description='Human‑readable description')
-
 
 class OperatorSchema(BaseModel):
 	name        : str             = Field(...,                  description='Operator name')
@@ -40,10 +38,6 @@ class OperatorSchema(BaseModel):
 
 class OperatorsSchema(BaseModel):
 	items: List[OperatorSchema]
-
-class OperatorSetTransactionsSchema(BaseModel):
-	name: str
-	transaction_ids: List[str]
 
 class OperatorInstanceSchema(BaseModel):
 	id         : str

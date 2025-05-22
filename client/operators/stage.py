@@ -25,7 +25,7 @@ class Stage(Operator):
 		elif isinstance(beat, dict) or isinstance(beat, list):
 			s = json.dumps(beat, indent=4, ensure_ascii=False)
 		else:
-			s = beat.to_log()
+			s = beat.log()
 		await log('beats', s, clear)
 
 	async def add_director_beat(self, story_id, character_ids, beats):

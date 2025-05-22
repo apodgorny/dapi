@@ -46,8 +46,6 @@ class TypeRecord(Record):
 	name         : Mapped[str]             = mapped_column(String(255),                  primary_key=True, comment='Unique type name (also class name)')
 	description  : Mapped[str]             = mapped_column(Text,                         nullable=True,    comment='Optional type description')
 	code         : Mapped[str]             = mapped_column(Text,                         nullable=False,   comment='Python source code of the type')
-	type_schema  : Mapped[Dict[str, Any]]  = mapped_column(MutableDict.as_mutable(JSON), nullable=False,   comment='Pydantic JSON Schema for the type')
-
 
 class OperatorRecord(Record):
 	__tablename__ = 'operators'

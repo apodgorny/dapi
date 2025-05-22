@@ -6,7 +6,7 @@ from .module          import Module
 from .string          import String
 from .o               import O
 from .dapi_exception  import DapiException
-from .transformations import Transform
+from .transform       import T
 
 PROJECT_PATH = os.environ.get('PROJECT_PATH')
 MODELS_DIR   = os.environ.get('MODELS_DIR')
@@ -17,14 +17,6 @@ class Model:
 
 	def __init__(self, name: str):
 		self.name = name
-
-	##################################################################
-
-	# def to_json_schema(self, schema: any) -> dict:
-	# 	if isinstance(schema, Datum):		                            return schema.to_schema()
-	# 	if isinstance(schema, type) and issubclass(schema, BaseModel):	return schema.model_json_schema()
-	# 	if isinstance(schema, dict):		                            return schema
-	# 	raise ValueError(f'Unsupported schema type: {type(schema).__name__}')
 
 	##################################################################
 
@@ -78,7 +70,7 @@ class Model:
 			response_model(**result)
 
 			# Unpack to tuple of attributes or single value to match operator output convention
-			result = Transform(Transform.DATA, Transform.ARGUMENTS, result)
+			result = T(T.DATA, T.ARGUMENTS, result)
 			return result
 
 		except Exception as e:

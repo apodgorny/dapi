@@ -6,7 +6,6 @@ from .schemas import (
 	TypeSchema,
 	OperatorSchema,
 	OperatorsSchema,
-	OperatorSetTransactionsSchema,
 	OperatorInstanceSchema,
 	OperatorScopeSchema,
 	OperatorInputSchema,

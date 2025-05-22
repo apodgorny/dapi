@@ -4,7 +4,6 @@ from .python            import Python
 from .string            import String
 from .highlight         import Highlight
 
-from .datum             import Datum, DatumSchemaError, DatumError
 from .module            import Module
 from .o                 import O
 from .model             import Model

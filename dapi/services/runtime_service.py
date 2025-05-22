@@ -9,7 +9,6 @@ from lib import (
 	DapiService,
 	ExecutionContext,
 	Python,
-	Datum,
 	Model,
 	String,
 
@@ -36,7 +35,6 @@ class RuntimeService(DapiService):
 			'Spinner'     : Spinner,
 
 			'O'           : O,
-			'Datum'       : Datum,
 			'String'      : String,
 			
 			'BaseModel'   : BaseModel,
@@ -109,10 +107,6 @@ class RuntimeService(DapiService):
 		output               = ''
 
 		try:
-			# Input is validated in sub-calls, but not in direct call.
-			# Here's additional layer of validation for that
-			Datum(operator.input_type).validate(input)
-
 			context.push(
 				name        = name,
 				lineno      = 1,

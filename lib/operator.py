@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import Callable
 
 from lib.o                 import O
-from lib.datum             import Datum
 from lib.string            import String
 from lib.autoargs          import autodecorate
 from lib.execution_context import ExecutionContext
@@ -70,8 +69,8 @@ class Operator:
 	async def call(self, name, **kwargs):
 		return await self.globals['call'](name, *[], **kwargs)
 
-	async def invoke(self) -> Datum:
-		'''Execute operator and return output Datum.'''
+	async def invoke(self):
+		'''Execute operator and return output.'''
 		raise NotImplementedError('Operator must implement invoke method')
 
 	def __repr__(self) -> str:
