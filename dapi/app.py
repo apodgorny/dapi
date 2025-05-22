@@ -1,11 +1,16 @@
 import os
-from fastapi                          import FastAPI
-from fastapi.middleware.cors  	      import CORSMiddleware
 
-from dapi.controller import dapi
-from dapi.middleware import enhance_openapi_schema
+from fastapi                 import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-os.environ['PROJECT_PATH'] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from dapi.controller         import dapi
+
+
+os.environ['PROJECT_PATH'] = os.path.dirname(
+	os.path.dirname(
+		os.path.abspath(__file__)
+	)
+)
 
 app = FastAPI()
 app.add_middleware(
@@ -15,7 +20,6 @@ app.add_middleware(
 	allow_headers     = ['*'],
 	allow_credentials = True,
 )
-# app.middleware('http')(enhance_openapi_schema)
 dapi.start(app)
 
 @app.on_event('startup')

@@ -7,6 +7,7 @@ from fastapi              import APIRouter
 from fastapi.responses    import JSONResponse
 
 from lib.string           import String
+from lib.o                import O
 from dapi.db              import Base, engine, SessionLocal
 from .dapi_exception      import DapiException
 
@@ -17,6 +18,8 @@ class Dapi:
 		self.router = APIRouter(prefix='/dapi')
 		self.db     = SessionLocal()
 		self.app    = None
+
+		O.set_db(self.db)
 
 		for cls in services:
 			setattr(self, String.camel_to_snake(cls.__name__), cls(self))

@@ -9,12 +9,13 @@ from .odb       import ODB
 
 class O(BaseModel):
 
-	__db__ = None
+	__db_session__ = None
 
 	# Magic
 	############################################################################
 
 	def __init__(self, *args, **kwargs):
+		self.__db__ = ODB(self.__db_session__, self)
 		if len(args) == 1 and isinstance(args[0], int) and self.__class__.__db__:
 			loaded = self.__class__.__db__.get(args[0])
 			if not loaded:
@@ -81,7 +82,7 @@ class O(BaseModel):
 
 	@classmethod
 	def set_db(cls, session):
-		cls.__db__ = ODB(session)
+		cls.__db_session__ = session
 
 	@classmethod
 	def db(cls):
