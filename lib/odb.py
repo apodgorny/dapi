@@ -1,47 +1,301 @@
+from sqlalchemy     import inspect
 from sqlalchemy.orm import Session
+
+from typing       import get_origin, List, Dict
 from .transform     import T
+from .edge          import Edge
 
 
 class ODB:
 
-	# Magic
+	session = None
+	types   = {}
+	objects = {}
+
+	# Class methods
 	################################################################################################
 
-	def __init__(self, session: Session, instance: 'O'):
-		self._session  = session
-		self._instance = instance
-		self._model    = type(instance)
-		self._table    = T(T.PYDANTIC, T.SQLALCHEMY_TABLE, self._model)
+	@classmethod
+	def load(cls, id: int, o_class: 'O') -> 'O':
+		if isinstance(o_class, str):
+			o_class = cls.types[o_class]
 
-	def __getattr__(self, name): return getattr(self._session, name)
+		key = (o_class, id)
+		if key in cls.objects:
+			return cls.objects[key]
+		
+		o         = cls._preload(id, o_class)
+		o.__db__  = ODB(o)
+		o.__id__  = id
+
+		cls.objects[key] = o
+
+		o.db._load_edges()
+		return o
+
+	@classmethod
+	def _preload(cls, id, o_class):
+		'''Loads simple data items and stubs for O, list[O] and dict[str, O]'''
+		orm_class = T(T.PYDANTIC, T.SQLALCHEMY_MODEL, o_class)
+		orm_obj   = cls.session.get(orm_class, id)
+
+		if not orm_obj:
+			raise ValueError(f'{o_class.__name__} with id={id} not found')
+
+		data = T(T.SQLALCHEMY_MODEL, T.DATA, orm_obj)
+
+		# # Ensure stubs for all fields exist
+		# for name, field in o_class.model_fields.items():
+		# 	print('name, field:', name, field.annotation)
+		# 	if name not in data:
+		# 		kind, _ = o_class.get_field_kind(name, field.annotation)
+		# 		if   kind == 'single' : data[name] = None
+		# 		elif kind == 'list'   : data[name] = []
+		# 		elif kind == 'dict'   : data[name] = {}
+
+		data.pop('id')
+		return o_class.model_construct(**data)
+
+	def _reload(self):
+		o     = self._o
+		oid   = o.id
+		otype = type(o)
+
+		if not oid:
+			raise ValueError(f'Cannot reload object of type {otype.__name__} without id')
+
+		new = otype.load(oid)
+		for name in o.model_fields:
+			setattr(o, name, getattr(new, name, None))
+		o.__db__ = self
+
+	def _reload_related(self):
+		o = self._o
+
+		for other in list(ODB.objects.values()):
+			if not isinstance(other, O): continue
+
+			for name, field in other.model_fields.items():
+				kind, _ = other.get_field_kind(name, field.annotation)
+				value   = getattr(other, name, None)
+
+				if kind == 'single':
+					if value is o:
+						other.db._reload()
+						break
+
+				elif kind == 'list' and isinstance(value, list):
+					if any(item is o for item in value):
+						other.db._reload()
+						break
+
+				elif kind == 'dict' and isinstance(value, dict):
+					if any(item is o for item in value.values()):
+						other.db._reload()
+						break
+
+	# Magic methods
+	################################################################################################
+
+	def __init__(self, instance: 'O'):
+		self._o         = instance
+		self._orm_class = T(T.PYDANTIC, T.SQLALCHEMY_MODEL, type(instance))
+		self._edge      = Edge(self.session)
+
+	def __getattr__(self, name): return getattr(self.session, name)
 
 	# Private
 	################################################################################################
 
-	def _o_or_none(self, obj): return obj if obj is None or isinstance(obj, self._model) else None
+	def _o_or_none(self, obj):
+		if isinstance(obj, type(self._o)):
+			return obj
+		return None
+
+	def _load_edges(self, seen=None):
+		o    = self._o
+		seen = seen or set()
+		key  = (type(o), o.id)
+
+		if key not in seen:
+			seen.add(key)
+			for name, field in o.model_fields.items():
+				if not name in o.__dict__:
+					value = self.get_related(name)
+					if value is None:
+						kind, _ = o.get_field_kind(name)
+						if   kind == 'list' : value = []
+						elif kind == 'dict' : value = {}
+						else                : value = None
+
+					setattr(o, name, value)
+					val = getattr(o, name)
+					if isinstance(val, list):
+						for item in val:
+							if hasattr(item, 'db'):
+								item.db._load_edges(seen)
+					elif hasattr(val, 'db'):
+						val.db._load_edges(seen)
+
+	def _save_edges(self):
+		o = self._o
+		s = self.session
+
+		def is_valid_edge_target(obj):
+			return (
+				o.is_o_instance(obj)
+				and obj.id is not None
+				and s.get(obj.db._orm_class, obj.id) is not None
+			)
+
+		for name, field in o.model_fields.items():
+			val         = getattr(o, name, None)
+			kind, inner = o.get_field_kind(name, field.annotation)
+
+			if kind == 'single' and is_valid_edge_target(val):
+				self._save_edge(o, val, name)
+
+			elif kind == 'list' and isinstance(val, list):
+				for i, item in enumerate(val):
+					if is_valid_edge_target(item):
+						self._save_edge(o, item, name, key1=str(i))
+
+			elif kind == 'dict' and isinstance(val, dict):
+				for k, item in val.items():
+					if is_valid_edge_target(item):
+						self._save_edge(o, item, name, key1=str(k))
+
+	def _find_reverse_field(self, target, source):
+		for name, field in target.model_fields.items():
+			kind, inner = target.get_field_kind(name, field.annotation)
+			if kind == 'single' and isinstance(source, inner): return name
+			if kind == 'list'   and isinstance(source, inner): return name
+			if kind == 'dict'   and isinstance(source, inner): return name
+		return ''
+
+	def _save_edge(self, src, tgt, rel1, key1=''):
+		if src.is_o_instance(tgt) and not getattr(tgt, '__deleted__', False):
+			tgt.save()
+			rel2 = self._find_reverse_field(tgt, src)
+			if src.id is not None and tgt.id is not None:
+				exists = self.session.query(self.edges.model).filter_by(
+					id1   = src.id,
+					id2   = tgt.id,
+					key1  = key1,
+					key2  = '',
+					rel1  = rel1,
+					rel2  = rel2
+				).first()
+				if not exists:
+					self.edges.create(
+						id1   = src.id,
+						type1 = src.__class__.__name__,
+						id2   = tgt.id,
+						type2 = tgt.__class__.__name__,
+						rel1  = rel1,
+						rel2  = rel2,
+						key1  = key1,
+						key2  = ''
+					)
+
+	def _update(self, obj_id, data):
+		record = self.session.get(self._orm_class, obj_id)
+
+		if record is None:
+			raise ValueError(f'Record with id={obj_id} not found in table `{self._orm_class.__tablename__}`')
+
+		for key, value in data.items():
+			setattr(record, key, value)
+
+		return record
+
+
+	def _save(self, data):
+		record = self._orm_class(**data)
+		self.session.add(record)
+		return record
+
 
 	# Public
 	################################################################################################
 
-	def create_table(self)          : self._table.create(self._session.bind, checkfirst=True)
-	def drop_table(self)            : self._table.drop(self._session.bind, checkfirst=True)
-	def query(self)                 : return self._session.query(self._model)
+	@property
+	def edges(self)                 : return self._edge
+
+	@property
+	def table_name(self)            : return self._orm_class.__tablename__
+
+	def query(self)                 : return self.session.query(self._orm_class)
+
+	def table_exists(self)          : return inspect(self.session.bind).has_table(self.table_name)
+	def create_table(self)          : self._orm_class.metadata.create_all(self.session.bind)
+	def drop_table(self)            : self._orm_class.metadata.drop_all(self.session.bind)
 
 	def filter(self, *args)         : return self.query().filter(*args)
-	def get(self, id)               : return self._o_or_none(self._session.get(self._model, id))
+	def get(self, id)               : return self._o_or_none(self.session.get(self._orm_class, id))
 	def first(self)                 : return self._o_or_none(self.query().first())
 	def count(self)                 : return self.query().count()
 	def exists(self)                : return self.query().exists().scalar()
-	def all(self)                   : return [r for r in self.query().all() if isinstance(r, self._model)]
+	def all(self)                   : return [r for r in self.query().all() if isinstance(r, self._orm_class)]
 
-	def update(self, where, values) : self.query().filter(where).update(values); self.commit()
-	def delete(self, *args)         : self.query().filter(*args).delete();       self.commit()
+	def refresh(self)               : self.session.refresh(self._o)
+	def expunge(self)               : self.session.expunge(self._o)
+	def add(self)                   : self.session.add(self._o)
+	def commit(self)                : self.create_table(); self.session.commit()
+	def rollback(self)              : self.session.rollback()
+	def flush(self)                 : self.session.flush()
+	def close(self)                 : self.session.close()
 
-	def refresh(self, obj=None)     : self._session.refresh(obj or self._instance)
-	def expunge(self, obj=None)     : self._session.expunge(obj or self._instance)
-	def add(self, obj=None)         : self._session.add(obj     or self._instance)
-	def save(self, obj=None)        : self.add(obj);       self.commit()
-	def commit(self)                : self.create_table(); self._session.commit()
-	def rollback(self)              : self._session.rollback()
-	def flush(self)                 : self._session.flush()
-	def close(self)                 : self._session.close()
+	def save(self):
+		data   = self._o.to_dict()
+		obj_id = getattr(self._o, '__id__', None)
+		self.create_table()
+		if obj_id : record = self._update(obj_id, data)
+		else      : record = self._save(data)
+
+		print('Saving record', record)
+		self.session.commit()
+
+		setattr(self._o, '__id__', getattr(record, 'id', None))
+		self._save_edges()
+		self._load_edges()
+
+	def delete(self):
+		id  = getattr(self._o, 'id', None)
+		typ = self._o.__class__.__name__
+
+		if id is not None:
+			self.session.query(self.edges.model).filter(
+				((self.edges.model.id1 == id) & (self.edges.model.type1 == typ)) |
+				((self.edges.model.id2 == id) & (self.edges.model.type2 == typ))
+			).delete()
+
+			self.query().filter(self._orm_class.id == id).delete()
+
+		self.commit()
+		self._o.__deleted__ = True
+
+	def get_related(self, name: str):
+		o      = self._o
+		edges  = self.edges.get_edges(o, rel=name)
+		result = []
+
+		for edge in edges:
+			if edge.rel1 == name and edge.id1 == o.id:
+				result.append(ODB.load(edge.id2, edge.type2))
+
+			elif edge.rel2 == name and edge.id2 == o.id:
+				result.append(ODB.load(edge.id1, edge.type1))
+
+		# Detect result type by field shape
+		field = o.model_fields.get(name)
+		if field is None:
+			raise AttributeError(f'Field `{name}` not found in {o.__class__.__name__}')
+		tp = field.annotation
+
+		if get_origin(tp) in (list, List) : return result
+		elif result                       : return result[0]
+		else                              : return None
+
+
+

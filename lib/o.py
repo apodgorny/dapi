@@ -1,4 +1,4 @@
-import os, json
+import os
 from typing   import Any, get_args, get_origin, Union, List, Dict
 
 from pydantic import BaseModel, Field, model_validator
@@ -9,68 +9,120 @@ from .odb       import ODB
 
 class O(BaseModel):
 
-	__db_session__ = None
+	@classmethod
+	def _make_optional(cls, tp):
+		origin = get_origin(tp)
+		args   = get_args(tp)
+
+		if cls.is_o_type(tp) or (
+			origin in (list, List, dict, Dict)
+			and any(cls.is_o_type(a) for a in args)
+		):
+			return Optional[tp]
+		return tp
+
+	def __init_subclass__(cls, **kwargs):
+		super().__init_subclass__(**kwargs)
+		for name, field in cls.model_fields.items():
+			new_type = cls._make_optional(field.annotation)
+			if new_type != field.annotation:
+				field.annotation = new_type
+				field.required   = False
 
 	# Magic
 	############################################################################
 
 	def __init__(self, *args, **kwargs):
-		self.__db__ = ODB(self.__db_session__, self)
-		if len(args) == 1 and isinstance(args[0], int) and self.__class__.__db__:
-			loaded = self.__class__.__db__.get(args[0])
-			if not loaded:
-				raise ValueError(f'{self.__class__.__name__} with id={args[0]} not found')
-			super().__init__(**loaded.to_dict())
-			self._resolve_foreign()
-		else:
-			super().__init__(*args, **kwargs)
-			self._resolve_foreign()
+		if 'id' in kwargs:
+			raise KeyError(f'Attribute `id` is reserved. Use `{self.__class__.__name__}.load(id)` instead')
+		super().__init__(*args, **kwargs)
+		self.__db__ = ODB(self)
+		self.__deleted__ = False
+
+	def __getattr__(self, name: str):
+		if name in self.model_fields:
+			raise AttributeError(name)
+
+		related = self.db.get_related(name)
+		if not related:
+			raise AttributeError(f'{self.__class__.__name__} has no attribute or edge `{name}`')
+		return related
 
 	def __str__(self) -> str:
-		return self.to_json()
+		return T(T.PYDANTIC, T.STRING, self)
 
 	def __repr__(self):
 		return f'<{self.__class__.__name__} id={self.id}>'
 
-	# Private
-	############################################################################
-
-	def _resolve_foreign(self):
-		for name, field in self.model_fields.items():
-			tp    = field.annotation
-			value = getattr(self, name, None)
-
-			if isinstance(tp, type) and issubclass(tp, O) and isinstance(value, int):
-				setattr(self, name, tp(value))
-
-			elif get_origin(tp) in (list, List):
-				subtype = get_args(tp)[0]
-				if isinstance(subtype, type) and issubclass(subtype, O):
-					fk_field = f'{self.__class__.__name__.lower()}_id'
-					items = subtype.db.filter(getattr(subtype, fk_field) == self.id).all()
-					setattr(self, name, items)
-
 	# Public class methods
 	############################################################################
 
-	@model_validator(mode='before')
 	@classmethod
-	def convert_nested_o(cls, data):
-		def convert(value):
-			if isinstance(value, O):
-				return value.to_dict()
-			if isinstance(value, list):
-				return [convert(v) for v in value]
-			return value
-		if isinstance(data, dict):
-			return {k: convert(v) for k, v in data.items()}
-		return data
+	def is_allowed_type(cls, tp: Any) -> bool:
+		origin = get_origin(tp)
+		args   = get_args(tp)
+
+		# Allow Optional[T]
+		if origin is Union and type(None) in args:
+			return cls.is_allowed_type(args[0])
+
+		# Allow primitives
+		if tp in (str, int, float, bool, type(None)):
+			return True
+
+		# Allow List[T]
+		if origin in (list, List):
+			return len(args) == 1 and cls.is_allowed_type(args[0])
+
+		# Allow Dict[str, T]
+		if origin in (dict, Dict):
+			return len(args) == 2 and args[0] is str and cls.is_allowed_type(args[1])
+
+		# Allow O models
+		if cls.is_o_type(tp):
+			return True
+
+		return False  # Disallow all else
 
 	@classmethod
-	def Field(cls, *args, description='', **kwargs):
-		if description:
-			kwargs.setdefault('json_schema_extra', {})['description'] = description
+	def validate_types(cls):
+		for name, field in cls.model_fields.items():
+			if not cls.is_allowed_type(field.annotation):
+				raise TypeError(f'Disallowed type in `{cls.__name__}` field `{name}`: {field.annotation}')
+
+	@classmethod
+	def Field(cls, *args, description='', semantic=False, **kwargs):
+		extra = kwargs.setdefault('json_schema_extra', {})
+		if description : extra['description'] = description
+		if semantic    : extra['semantic']    = True
 		return Field(*args, description=description, **kwargs)
+
+	@classmethod
+	def is_o_type(cls, tp: Any) -> bool:
+		return isinstance(tp, type) and issubclass(tp, O)
+
+	@classmethod
+	def is_o_instance(cls, obj: Any) -> bool:
+		return isinstance(obj, O)
+
+	@classmethod
+	def get_field_kind(cls, name, tp=None):
+		tp = tp or cls.model_fields[name].annotation
+
+		if O.is_o_type(tp):
+			return 'single', tp
+
+		if get_origin(tp) in (list, List):
+			sub = get_args(tp)[0]
+			if O.is_o_type(sub):
+				return 'list', sub
+
+		if get_origin(tp) in (dict, Dict):
+			k, v = get_args(tp)
+			if k is str and O.is_o_type(v):
+				return 'dict', v
+
+		return None, None
 
 	@classmethod
 	def to_schema_prompt(cls) -> str:
@@ -81,38 +133,39 @@ class O(BaseModel):
 		return T(T.PYDANTIC, T.DEREFERENCED_JSONSCHEMA, cls)
 
 	@classmethod
-	def set_db(cls, session):
-		cls.__db_session__ = session
-
-	@classmethod
-	def db(cls):
-		return cls.__db__
-
-	@classmethod
-	def create_table(cls):
-		cls.db().create_table()
-
-	@classmethod
-	def drop_table(cls):
-		cls.db().drop_table()
+	def load(cls, id: int) -> 'O':
+		return ODB.load(id, cls)
 
 	# Getters
 	############################################################################
 
 	@property
 	def db(self):
-		return self.__class__.__db__
+		return self.__db__
 
 	@property
 	def id(self):
-		return getattr(self, '__id__', None)
+		return self.__dict__.get('__id__')
 
 	# Public
 	############################################################################
 
-	def to_prompt(self) -> str  : return self.to_json()
-	def to_dict(self)   -> dict : return T(T.PYDANTIC, T.DATA, self)
-	def to_json(self)   -> str  : return json.dumps(self.to_dict(), indent=4, ensure_ascii=False)
+	def to_prompt(self)                 -> str  : return self.to_json()
+	def to_json(self, r=False)          -> str  : return json.dumps(self.to_dict(r, e=True), indent=4, ensure_ascii=False)
+	def to_dict(self, r=False, e=False) -> dict : return T(T.PYDANTIC, T.DATA, self, recursive=r, show_empty=e)
+	def to_tree(self)                   -> str  : return T(T.PYDANTIC, T.TREE, self)
+
+	def to_semantic_hint(self) -> str:
+		data = T(T.PYDANTIC, T.DATA, self)
+		fields = self.model_fields
+		lines = []
+
+		for name, value in data.items():
+			info = fields[name].json_schema_extra or {}
+			if info.get('semantic') and value is not None:
+				lines.append(f'{name}: {value}')
+
+		return ' | '.join(lines)
 
 	def clone(self):
 		data = self.to_dict()
@@ -120,15 +173,10 @@ class O(BaseModel):
 		return self.__class__(**data)
 
 	def save(self):
-		for name, field in self.model_fields.items():
-			tp    = field.annotation
-			value = getattr(self, name, None)
-			if isinstance(tp, type) and issubclass(tp, O) and isinstance(value, O):
-				value.save()
-		self.db.__class__(self.db._session, self).save()
+		self.db.save()
 
 	def delete(self):
-		self.db.__class__(self.db._session, self).delete()
+		self.db.delete()
 
 	def get_description(self, field: str) -> str:
 		info = self.model_fields.get(field)

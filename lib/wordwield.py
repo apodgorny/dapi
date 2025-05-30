@@ -3,13 +3,16 @@ import os, sys, inspect, httpx, ast, json
 from pathlib  import Path
 from pydantic import BaseModel
 
-from lib import String, Highlight, Operator, Code
+from .string      import String
+from .highlight   import Highlight
+from .operator    import Operator
+from .code        import Code
 
 DAPI_URL = os.path.join(os.environ.get('DAPI_URL'))
 
 
 class WordWield:
-	verbose        = True
+	verbose        = False
 	is_initialized = False
 
 	# Private methods
@@ -80,12 +83,11 @@ class WordWield:
 	@classmethod
 	def init(cls):
 		'''Create all Operator and O-descendant types defined in the caller scope.'''
-		frame     = inspect.currentframe().f_back.f_back
-		module    = inspect.getmodule(frame)
-		objects   = vars(sys.modules[module.__name__])
-
+		# frame     = inspect.currentframe().f_back.f_back
+		# module    = inspect.getmodule(frame)
+		# objects   = vars(sys.modules[module.__name__])
+		objects   = Code.collect_all_objects()
 		operators = Code.collect_operators(objects)
-
 		Code.collect_types(objects)  # populates type_pool including nested
 
 		for type_def in Code.type_pool.values():  # includes all, not just roots
@@ -111,29 +113,27 @@ class WordWield:
 			WordWield.print(f'{prefix} {message}')
 
 	@staticmethod
-	def error(severity, message):
-		if not WordWield.verbose:
-			return
-		try:
-			prefix = String.color(severity.upper() + ':', WordWield._color(severity))
-		except:
-			prefix = severity.upper() + ':'
+	def error(severity, message, info=None, trace=None):
+		prefix = String.color(severity.upper() + ':', WordWield._color(severity))
 		message = str(message).replace('\n', '\n')
 		WordWield.print(f'{prefix} {message}')
+		if info is not None:
+			WordWield.print(String.color(info, String.GRAY))
+		if trace is not None:
+			WordWield.print(String.color(trace, String.GRAY))
+		exit(0)
 
 	@staticmethod
 	def request(method: str, path: str, **kwargs):
-		url = f'{DAPI_URL}/{path.lstrip("/")}'
+		url_name = kwargs.get('json', {}).get('name', '')
+		url      = '/'.join([DAPI_URL, path.lstrip('/'), url_name]).strip('/')
 		kwargs.setdefault('timeout', 1200.0)
 
 		if WordWield.verbose:
 			bar = f'  {"- " * 22}'
 			WordWield.print('\n' + ('-' * 45))
-			# WordWield.print(String.underlined(f'Calling `{path}`'))
 			if 'json' in kwargs:
-				# WordWield.print(f'\n{bar}', color=String.DARK_GRAY)
 				for key, val in kwargs['json'].items():
-					# WordWield.print(f'  {key:<16}{String.color(":", String.GRAY)} ', end='')
 					if isinstance(val, dict):
 						val = json.dumps(val, indent=2, ensure_ascii=False)
 						val = Highlight.python(val)
@@ -146,19 +146,30 @@ class WordWield:
 				WordWield.print(bar, color=String.DARK_GRAY)
 
 		try:
-			res = httpx.request(method, url, **kwargs)
-			res.raise_for_status()
-			return res.json()
-		except httpx.HTTPStatusError as e:
-			severity, message, trace = WordWield._extract_dapi_error(e.response)
-			WordWield.error(severity, message)
-			if trace:
-				WordWield.print(String.color(trace, String.GRAY))
-			if severity == 'halt':
-				raise
+			res  = httpx.request(method, url, **kwargs)
+			data = res.json()
+
+			if res.status_code >= 400:
+				severity = data.get('severity', 'halt')
+				detail   = data.get('detail', f'Status {res.status_code}')
+				file     = data.get('file')
+				line     = data.get('line')
+				operator = data.get('operator')
+				trace    = data.get('trace')
+
+				info  = ''
+				parts = []
+
+				if operator : parts.append(f'operator: {operator}')
+				if file     : parts.append(f'file: {Path(file).name}')
+				if line     : parts.append(f'line: {line}')
+				if parts    : info = ', '.join(parts)
+
+				WordWield.error(severity, f'DAPI Error: {detail}', info, trace)
+			return data
 
 		except Exception as e:
-			# WordWield.error('halt', str(e))
+			WordWield.error('halt', str(e))
 			raise
 
 	@classmethod

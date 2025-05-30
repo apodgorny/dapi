@@ -1,23 +1,42 @@
-from .dapi              import Dapi, DapiException, DapiService
-from .python            import Python
+import os
+from dotenv import load_dotenv
 
-from .string            import String
-from .highlight         import Highlight
+load_dotenv()
 
-from .module            import Module
-from .o                 import O
-from .model             import Model
 
-from .operator          import Operator
-from .agent             import Agent
-from .agent_on_grid     import AgentOnGrid
-from .spinner           import Spinner
+if 'CLIENT' in os.environ:
+	from .string            import String
+	from .highlight         import Highlight
+	from .wordwield         import WordWield
+	from .code              import Code
 
-from .execution_context import ExecutionContext
+	from .o                 import O
+	from .operator          import Operator
+	from .agent             import Agent
+	from .agent_on_grid     import AgentOnGrid
+	from .spinner           import Spinner
 
-from .reserved          import is_reserved
-from .autoargs          import autoargs, autodecorate
-from .jscpy             import jscpy, Jscpy
+else:
+	from .dapi              import Dapi, DapiException, DapiService
+	from .python            import Python
 
-from .code              import Code
-from .wordwield         import WordWield
+	from .string            import String
+	from .highlight         import Highlight
+
+	from .module            import Module
+	from .o                 import O
+	from .model             import Model
+
+	from .operator          import Operator
+	from .agent             import Agent
+	from .agent_on_grid     import AgentOnGrid
+	from .spinner           import Spinner
+
+	from .execution_context import ExecutionContext
+
+	from .reserved          import is_reserved
+	from .autoargs          import autoargs, autodecorate
+	from .jscpy             import jscpy, Jscpy
+
+	from .edge              import Edge
+	from .record            import Record

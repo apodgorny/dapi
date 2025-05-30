@@ -1,11 +1,13 @@
-import copy
+import copy, re, json
 from typing import Any, get_args, get_origin, Union, List, Dict
 
-from pydantic import BaseModel, create_model
+from pydantic        import BaseModel, create_model
 from pydantic.fields import FieldInfo
-from sqlalchemy import Table, Column, MetaData, Integer, String
+from sqlalchemy      import Table, Column, MetaData, Integer, String
+from sqlalchemy.orm  import declarative_base
 
 from .t import T
+from .record import Record
 
 
 T.PYDANTIC(BaseModel)
@@ -13,11 +15,78 @@ T.JSONSCHEMA(dict)
 T.DEREFERENCED_JSONSCHEMA(dict)
 T.DATA()
 T.ARGUMENTS(None)
-T.SQLALCHEMY_TABLE(object)
+T.SQLALCHEMY_MODEL(object)
 T.PROMPT(str)
 T.FIELD(FieldInfo)
 T.TYPE(str)
 T.STRING(str)
+T.TREE(dict)
+
+class PYDANTIC:
+	@staticmethod
+	def is_pydantic(value):
+			return isinstance(value, BaseModel)
+
+	@staticmethod
+	def is_pydantic_class(tp):
+		return isinstance(tp, type) and issubclass(tp, BaseModel)
+
+	@staticmethod
+	def is_excluded_type(tp):
+		# unwrap Optional[...] → T
+		if get_origin(tp) is Union:
+			args = [a for a in get_args(tp) if a is not type(None)]
+			if len(args) == 1:
+				tp = args[0]
+
+		origin = get_origin(tp)
+		args   = get_args(tp)
+
+		if PYDANTIC.is_pydantic_class(tp):
+			return True
+
+		if origin in (list, List):
+			return len(args) == 1 and PYDANTIC.is_pydantic_class(args[0])
+
+		if origin in (dict, Dict):
+			return len(args) == 2 and args[0] is str and PYDANTIC.is_pydantic_class(args[1])
+
+		return False
+
+
+@T.register(T.PYDANTIC, T.STRING)
+def model_to_string(obj):
+	id_str = f'({obj.id})' if obj.id else ''
+	data   = obj.to_dict(r=False, e=True)
+
+	def indent(text, level):
+		pad = ' ' * (level * 4)
+		return '\n'.join(pad + line if line else '' for line in text.splitlines())
+
+	def fmt_value(value, level=1):
+		if isinstance(value, BaseModel):
+			return indent(str(value), level)
+		if isinstance(value, list):
+			items = ',\n'.join(fmt_value(v, level + 1) for v in value)
+			return '[\n' + items + '\n' + ' ' * (level * 4) + ']'
+		if isinstance(value, dict):
+			items = ',\n'.join(
+				' ' * ((level + 1) * 4) + f'"{k}": {fmt_value(v, level + 1)}'
+				for k, v in value.items()
+			)
+			return '{\n' + items + '\n' + ' ' * (level * 4) + '}'
+		return json.dumps(value, ensure_ascii=False)
+
+	lines = [f'{obj.__class__.__name__}{id_str} {{']
+
+	items = list(data.items())
+	for i, (name, value) in enumerate(items):
+		is_last = i == len(items) - 1
+		comma   = '' if is_last else ','
+		lines.append(f'    "{name}": {fmt_value(value, 1)}{comma}')
+		
+	lines.append('}')
+	return re.sub(':[ ]+', ': ', '\n'.join(lines))
 
 
 @T.register(T.PYDANTIC, T.JSONSCHEMA)
@@ -26,15 +95,47 @@ def model_to_schema(model: type[BaseModel]) -> dict:
 
 
 @T.register(T.PYDANTIC, T.DATA)
-def model_to_data(obj):
-	if isinstance(obj, BaseModel):
-		return {k: model_to_data(v) for k, v in obj.model_dump().items()}
-	elif isinstance(obj, dict):
-		return {k: model_to_data(v) for k, v in obj.items()}
-	elif isinstance(obj, (list, tuple, set)):
-		return [model_to_data(v) for v in obj]
-	else:
-		return obj
+def model_to_data(obj, recursive=False, show_empty=False):
+	def convert(value, seen):
+		if PYDANTIC.is_pydantic(value):
+			if recursive:
+				if id(value) in seen:
+					return None
+				seen.add(id(value))
+				return {
+					k: convert(v, seen)
+					for k, v in value.model_dump().items()
+				}
+			else:
+				return None
+
+		if isinstance(value, dict):
+			return {
+				k: convert(v, seen)
+				for k, v in value.items()
+				if recursive or not PYDANTIC.is_pydantic(v)
+			}
+
+		if isinstance(value, (list, tuple, set)):
+			return [
+				convert(v, seen)
+				for v in value
+				if recursive or not PYDANTIC.is_pydantic(v)
+			]
+
+		return value
+
+	if PYDANTIC.is_pydantic(obj):
+		if not recursive:
+			return {
+				k: getattr(obj, k)
+				for k, f in obj.model_fields.items()
+				if show_empty or not PYDANTIC.is_excluded_type(f.annotation)
+			}
+		return convert(obj, seen=set())
+
+	return convert(obj, seen=set())
+
 
 @T.register(T.JSONSCHEMA, T.DEREFERENCED_JSONSCHEMA)
 def dereference_schema(schema: dict) -> dict:
@@ -80,46 +181,75 @@ def data_to_arguments(data):
 	return args
 
 
-@T.register(T.PYDANTIC, T.SQLALCHEMY_TABLE)
-def pydantic_to_table(model: type[BaseModel]) -> Table:
-	metadata = MetaData()
-	columns  = []
-
-	for name, field in model.model_fields.items():
-		ftype = field.annotation
-		sql_type = (
-			Integer if ftype is int else
-			String  if ftype is str else
-			String  # fallback for now
-		)
-		columns.append(
-			Column(name, sql_type, primary_key=(name == 'id'))
-		)
-
-	return Table(model.__name__.lower(), metadata, *columns)
+######################################## SQLALCHEMY ########################################
 
 
-@T.register(T.SQLALCHEMY_TABLE, T.PYDANTIC)
-def table_to_model(table: Table) -> type[BaseModel]:
+@T.register(T.PYDANTIC, T.SQLALCHEMY_MODEL)
+def pydantic_to_sqlalchemy_model(model: type[BaseModel]) -> type:
 	fields = {}
 
-	for col in table.columns:
-		# crude type mapping
-		if isinstance(col.type, Integer):
-			py_type = int
-		elif isinstance(col.type, String):
-			py_type = str
-		else:
-			py_type = str  # fallback
+	if issubclass(model, BaseModel):
+		fields['id'] = Column(Integer, primary_key=True, autoincrement=True)
 
-		# required if not nullable and no default
+		for name, field in model.model_fields.items():
+			is_id_field = name == 'id'                            # Skip 'id' — already handled
+			ftype       = field.annotation                        # Raw field type
+			excluded    = PYDANTIC.is_excluded_type(ftype)        # Nested Pydantic models are stored via edges
+
+			if not is_id_field and not excluded:
+				sql_type = (                                       # Map basic types to SQLAlchemy columns
+					Integer if ftype is int  else
+					String  if ftype is str  else
+					JSON    if ftype is dict else
+					String
+				)
+
+				nullable     = not field.is_required()            # Optional fields become nullable
+				fields[name] = Column(sql_type, nullable=nullable)
+
+		name  = model.__name__ + 'Orm'
+		table = type(name, (Record,), {
+			'__tablename__'  : model.__name__.lower(),
+			'__table_args__' : {
+				'extend_existing'      : True,
+				'sqlite_autoincrement' : True
+			},
+			**fields
+		})
+
+	else:
+		table = model  # Already a table — passthrough
+
+	return table
+
+
+@T.register(T.SQLALCHEMY_MODEL, T.PYDANTIC)
+def sqlalchemy_model_to_pydantic(orm_cls: type) -> type[BaseModel]:
+	fields = {}
+
+	for col in orm_cls.__table__.columns:
+		if   isinstance(col.type, Integer) : py_type = int
+		elif isinstance(col.type, String)  : py_type = str
+		else                               : py_type = str  # fallback
+
 		required = col.nullable is False and col.default is None and not col.autoincrement
-		default = ... if required else None
+		default  = ... if required else None
 
 		fields[col.name] = (py_type, default)
 
-	model_name = ''.join(word.capitalize() for word in table.name.split('_')) + 'Model'
-	return create_model(model_name, **fields)
+	name = orm_cls.__name__.replace('Orm', '') + 'Schema'
+	return create_model(name, **fields)
+
+
+@T.register(T.SQLALCHEMY_MODEL, T.DATA)
+def sqlalchemy_model_to_data(obj):
+	if not hasattr(obj, '__table__'):
+		raise TypeError(f'❌ Expected SQLAlchemy model, got: {type(obj)} → {obj}')
+	columns = set(obj.__table__.columns.keys())
+	return {
+		k: getattr(obj, k)
+		for k in columns
+	}
 
 
 ######################################## TYPE ########################################
@@ -206,3 +336,28 @@ def pydantic_to_prompt(model_cls: type[BaseModel], indent: int = 0) -> str:
 		lines.append(T(T.FIELD, T.PROMPT, field, indent + 1))
 	lines.append(pad + '}')
 	return '\n'.join(lines)
+
+
+@T.register(T.DATA, T.TREE)
+def data_to_tree(data: dict, prefix=''):
+	def walk(node, prefix='', is_last=True):
+		conn    = '└── ' if is_last else '├── '
+		subpref = '    ' if is_last else '│   '
+
+		if isinstance(node, dict):
+			keys = list(node.keys())
+			for i, k in enumerate(keys):
+				is_last = i == len(keys) - 1
+				val = node[k]
+				print(f'{prefix}{conn}{k}')
+				walk(val, prefix + subpref, is_last)
+		elif isinstance(node, list):
+			for i, item in enumerate(node):
+				is_last = i == len(node) - 1
+				print(f'{prefix}{"└── " if is_last else "├── "}[{i}]')
+				walk(item, prefix + ('    ' if is_last else '│   '), is_last)
+		else:
+			print(f'{prefix}{conn}{repr(node)}')
+
+	walk(data)
+

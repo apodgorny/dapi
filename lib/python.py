@@ -109,9 +109,10 @@ class Python:
 			self._apply_restrictions(tree)
 
 		class CallRewriter(ast.NodeTransformer):
-			def __init__(self, globals: set[str]):
+			def __init__(self, globals, registered_operators):
 				super().__init__()
-				self.globals = globals
+				self.globals              = globals
+				self.registered_operators = registered_operators
 
 			def visit_Call(self, node: ast.Call) -> ast.AST:
 				self.generic_visit(node)
@@ -138,7 +139,7 @@ class Python:
 				return node
 
 		# 🔧 применяем AST преобразования
-		tree = CallRewriter(self.globals).visit(tree)
+		tree = CallRewriter(self.globals, self.registered_operators).visit(tree)
 		ast.fix_missing_locations(tree)
 
 		# 🔥 добавляем код в linecache под псевдо-именем

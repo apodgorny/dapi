@@ -1,6 +1,8 @@
 import inspect
 
-from lib import Operator, O, String
+from .operator import Operator
+from .o        import O
+from .string   import String
 
 
 class Code:
@@ -32,15 +34,49 @@ class Code:
 			raise TypeError('Unsupported object type for code and schema extraction')
 
 	@staticmethod
+	def collect_all_objects():
+		import sys
+		module  = sys.modules['__main__']
+		objs    = {}
+		visited = set()
+
+		def recurse(mod):
+			if not hasattr(mod, '__name__'):
+				return
+			if mod.__name__ in visited:
+				return
+			visited.add(mod.__name__)
+			objs.update(vars(mod))
+			for name in dir(mod):
+				attr = getattr(mod, name, None)
+				if inspect.ismodule(attr) and attr.__name__.startswith(module.__name__):
+					recurse(attr)
+
+		recurse(module)
+		return objs
+
+
+	@staticmethod
 	def collect_operators(objects):
-		Code.operator_pool = {
-			String.to_snake_case(obj.__name__): Code.get_code_and_schema(obj)
-			for name, obj in objects.items()
-			if inspect.isclass(obj)
-			and issubclass(obj, Operator)
-			and obj is not Operator
-			and name not in ['Agent', 'AgentOnGrid']
-		}
+		Code.operator_pool = {}
+
+		for name, obj in objects.items():
+			if not inspect.isclass(obj):
+				continue
+			if not issubclass(obj, Operator):
+				continue
+			if obj is Operator:
+				continue
+			if name in ['Agent', 'AgentOnGrid']:
+				continue
+
+			try:
+				op_def = Code.get_code_and_schema(obj)
+				snake  = String.to_snake_case(obj.__name__)
+				Code.operator_pool[snake] = op_def
+			except Exception as e:
+				print(f'  ⚠️  Failed to process {name}: {e}')
+
 		return list(Code.operator_pool.values())
 
 	@staticmethod

@@ -76,10 +76,16 @@ class DefinitionService(DapiService):
 
 	async def delete_all(self) -> None:
 		'''Delete all restricted operators.'''
-		self.dapi.db.query(OperatorRecord)             \
-			.filter(OperatorRecord.restrict.is_(True)) \
-			.delete(synchronize_session=False)
-		self.dapi.db.commit()
+		try:
+			self.dapi.db.query(OperatorRecord)             \
+				.filter(OperatorRecord.restrict.is_(True)) \
+				.delete(synchronize_session=False)
+			self.dapi.db.commit()
+		except Exception as e:
+			if 'database is locked' in str(e):
+				raise RuntimeError('❌ SQLite database is locked. Close other connections or wait.')
+			else:
+				raise
 
 	############################################################################
 

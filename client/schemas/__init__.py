@@ -3,7 +3,6 @@ from .character_schema  import CharacterSchema
 from .location_schema   import LocationSchema
 from .story_schema      import StorySchema
 from .relations_schema  import RelationsSchema, RelationSchema
-from .beat_schema       import BeatSchema, DirectorBeatSchema
 
 from .psychology import (
 	Personality,
@@ -17,4 +16,14 @@ from .psychology import (
 	TraumaAttributes,
 	TraumaComponents,
 	TraumaCoping,
+)
+
+from .narrative_schemas import (
+	VoiceSchema,
+	BeatSchema,
+	ThreadSchema,
+	TimelineSchema,
+	CharacterSchema,
+	SituationSchema,
+	SceneSchema
 )

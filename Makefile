@@ -16,4 +16,4 @@ apitest:
 	clear && schemathesis run http://127.0.0.1:8000/openapi.json --base-url=http://localhost:8000 --experimental=openapi-3.1 || true && rm "$(PROJECT_PATH)/dapi.db"
 
 clear:
-	clear && rm "$(PROJECT_PATH)/dapi.db" && echo "Cleared database"
+	rm "$(PROJECT_PATH)/dapi.db" && echo "Cleared database"

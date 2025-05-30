@@ -22,7 +22,6 @@ class TypeService(DapiService):
 		}
 
 	async def initialize(self):
-		self._type_cache = {}
 		await super().initialize()
 
 	async def create(self, schema: TypeSchema):
@@ -44,8 +43,8 @@ class TypeService(DapiService):
 
 	async def get(self, name, context) -> TypeSchema:
 		extra_globals = self.dapi.runtime_service.get_globals(context)
-		if name in self._type_cache:
-			return self._type_cache[name]
+		if name in self.dapi.odb.types:
+			return self.dapi.odb.types[name]
 
 		record = self.dapi.db.get(TypeRecord, name)
 		if not record:
@@ -74,13 +73,12 @@ class TypeService(DapiService):
 				get_external_type = self.get,
 				context           = context
 			)
-			self._type_cache[name] = loaded_type
+			self.dapi.odb.types[name] = loaded_type
 			return loaded_type
 		except Exception as e:
 			raise DapiException.consume(e)
 		finally:
 			context.pop()
-		return TypeSchema(**record.to_dict())
 
 	async def get_all(self, context) -> list[TypeSchema]:
 		classes = {}

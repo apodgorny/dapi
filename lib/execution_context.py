@@ -94,7 +94,7 @@ class ExecutionContext:
 	def push(self, 
 		name       : str,
 		lineno     : int   = 1,
-		restrict : bool  = True,
+		restrict   : bool  = True,
 		file       : str   = None,
 		line       : str   = None,
 		importance : float = 0,
@@ -105,7 +105,7 @@ class ExecutionContext:
 			file       = file,
 			line       = line,
 			lineno     = lineno,
-			restrict = restrict,
+			restrict   = restrict,
 			importance = importance
 		)
 
