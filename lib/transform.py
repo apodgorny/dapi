@@ -42,21 +42,15 @@ class PYDANTIC:
 		origin = get_origin(tp)
 		args   = get_args(tp)
 
-		if PYDANTIC.is_pydantic_class(tp):
-			return True
-
-		if origin in (list, List):
-			return len(args) == 1 and PYDANTIC.is_pydantic_class(args[0])
-
-		if origin in (dict, Dict):
-			return len(args) == 2 and args[0] is str and PYDANTIC.is_pydantic_class(args[1])
+		if PYDANTIC.is_pydantic_class(tp) : return True
+		if origin in (list, List)         : return len(args) == 1                    and PYDANTIC.is_pydantic_class(args[0])
+		if origin in (dict, Dict)         : return len(args) == 2 and args[0] is str and PYDANTIC.is_pydantic_class(args[1])
 
 		return False
 
-
 @T.register(T.PYDANTIC, T.STRING)
 def model_to_string(obj):
-	name    = getattr(obj, 'global_name', None)
+	name    = obj.db.get_name()
 	label   = f'{name}:' if name else ''
 	id_str  = f'({label}{obj.id})' if obj.id else ''
 	data    = obj.to_dict(r=False, e=True)

@@ -328,9 +328,9 @@ class ODB:
 			type2 = self._o.__class__.__name__
 		).first()
 
-		if not record:
-			raise ValueError(f'❌ No global name found for object {self._o}')
-		return record.key1
+		if record:
+			return record.key1
+		return None
 
 	def set_name(self, name: str):
 		if not self._o.id:
