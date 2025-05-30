@@ -22,4 +22,4 @@ from lib import WordWield as ww
 
 ################################################################
 
-ww.invoke(Timeline, text = 'foobar')
+ww.invoke(Timeline, name = 'timeline')

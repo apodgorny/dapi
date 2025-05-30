@@ -69,14 +69,18 @@ def model_to_string(obj):
 		if isinstance(value, BaseModel):
 			return indent(str(value), level)
 		if isinstance(value, list):
-			items = ',\n'.join(fmt_value(v, level + 1) for v in value)
-			return '[\n' + items + '\n' + ' ' * (level * 4) + ']'
+			if value:
+				items = ',\n'.join(fmt_value(v, level + 1) for v in value)
+				return '[\n' + items + '\n' + ' ' * (level * 4) + ']'
+			return '[]'
 		if isinstance(value, dict):
-			items = ',\n'.join(
-				' ' * ((level + 1) * 4) + f'"{k}": {fmt_value(v, level + 1)}'
-				for k, v in value.items()
-			)
-			return '{\n' + items + '\n' + ' ' * (level * 4) + '}'
+			if value:
+				items = ',\n'.join(
+					' ' * ((level + 1) * 4) + f'"{k}": {fmt_value(v, level + 1)}'
+					for k, v in value.items()
+				)
+				return '{\n' + items + '\n' + ' ' * (level * 4) + '}'
+			return '{}'
 		return json.dumps(value, ensure_ascii=False)
 
 	lines = [f'{obj.__class__.__name__}{id_str} {{']

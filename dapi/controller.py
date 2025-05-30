@@ -59,7 +59,8 @@ async def reset_operators(input: EmptySchema):
 # RUNTIME invoke
 ############################################################################
 
-@dapi.router.post('/{operator_name}', include_in_schema=False)
+@dapi.router.post('/{operator_name}',                  include_in_schema=False)
+@dapi.router.post('/{operator_name}/{operator_name1}', include_in_schema=False)
 async def dynamic_operator_handler(operator_name: str, input: dict):
 	context = ExecutionContext()
 	result  = await dapi.runtime_service.invoke(operator_name, input, context)

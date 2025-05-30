@@ -14,79 +14,24 @@ class ODB:
 	types   = {}
 	objects = {}
 
-	# Class methods – global name related
-	################################################################################################
-
-	@classmethod
-	def get_name(cls, obj: 'O') -> str:
-		if not obj.id:
-			raise ValueError('❌ Object must be saved before retrieving a name')
-
-		record = cls.session.query(EdgeRecord).filter_by(
-			type1 = 'global',
-			id1   = 0,
-			rel1  = 'ref',
-			id2   = obj.id,
-			type2 = obj.__class__.__name__
-		).first()
-
-		if not record:
-			raise ValueError(f'❌ No global name found for object {obj}')
-		return record.key1
-
-	@classmethod
-	def get_by_name(cls, name: str, typ: type) -> 'O':
-		record = cls.session.query(EdgeRecord).filter_by(
-			type1 = 'global',
-			id1   = 0,
-			rel1  = 'ref',
-			key1  = name,
-			type2 = typ.__name__
-		).first()
-
-		if not record:
-			raise ValueError(f'❌ Named object `{name}` of type `{typ.__name__}` not found')
-		return cls.load(record.id2, typ)
-
-	@classmethod
-	def set_name(cls, obj: 'O', name: str):
-		if not obj.id:
-			raise ValueError('❌ Object must be saved before assigning a name')
-
-		cls.unset_name(obj)
-		cls.session.add(EdgeRecord(
-			id1   = 0,
-			type1 = 'global',
-			id2   = obj.id,
-			type2 = obj.__class__.__name__,
-			rel1  = 'ref',
-			key1  = name
-		))
-		cls.session.commit()
-
-	@classmethod
-	def unset_name(cls, obj: 'O'):
-		if not obj.id:
-			raise ValueError('❌ Object must be saved before assigning a name')
-
-		cls.session.query(EdgeRecord).filter_by(
-			type1 = 'global',
-			id1   = 0,
-			rel1  = 'ref',
-			id2   = obj.id,
-			type2 = obj.__class__.__name__
-		).delete()
-		cls.session.commit()
-
 	# Class methods
 	################################################################################################
 
 	@classmethod
-	def load(cls, id: int, o_class: 'O') -> 'O':
+	def load(cls, id_or_name: int | str, o_class: 'O') -> 'O':
+		if isinstance(id_or_name, int):
+			return cls.load_by_id(id_or_name, o_class)
+		if isinstance(id_or_name, str):
+			return cls.load_by_name(id_or_name, o_class)
+		return None
+
+	@classmethod
+	def load_by_id(cls, id: int, o_class: 'O') -> 'O':
 		if isinstance(o_class, str):
 			o_class = cls.types[o_class]
 
-		key = (o_class, id)
+		key     = (o_class, id)
+
 		if key in cls.objects:
 			return cls.objects[key]
 		
@@ -100,6 +45,19 @@ class ODB:
 		return o
 
 	@classmethod
+	def load_by_name(cls, name: str, o_class: 'O') -> 'O':
+		record = cls.session.query(EdgeRecord).filter_by(
+			type1 = 'global',
+			id1   = 0,
+			rel1  = 'ref',
+			key1  = name,
+		).first()
+
+		if record:
+			return cls.load(record.id2, o_class)
+		return None
+
+	@classmethod
 	def _preload(cls, id, o_class):
 		'''Loads simple data items and stubs for O, list[O] and dict[str, O]'''
 		orm_class = T(T.PYDANTIC, T.SQLALCHEMY_MODEL, o_class)
@@ -109,16 +67,6 @@ class ODB:
 			raise ValueError(f'{o_class.__name__} with id={id} not found')
 
 		data = T(T.SQLALCHEMY_MODEL, T.DATA, orm_obj)
-
-		# # Ensure stubs for all fields exist
-		# for name, field in o_class.model_fields.items():
-		# 	print('name, field:', name, field.annotation)
-		# 	if name not in data:
-		# 		kind, _ = o_class.get_field_kind(name, field.annotation)
-		# 		if   kind == 'single' : data[name] = None
-		# 		elif kind == 'list'   : data[name] = []
-		# 		elif kind == 'dict'   : data[name] = {}
-
 		data.pop('id')
 		return o_class.model_construct(**data)
 
@@ -310,17 +258,24 @@ class ODB:
 	def flush(self)                 : self.session.flush()
 	def close(self)                 : self.session.close()
 
-	def save(self):
+	def save(self, global_name=None):
 		data   = self._o.to_dict()
 		obj_id = getattr(self._o, '__id__', None)
+
 		self.create_table()
+
 		if obj_id : record = self._update(obj_id, data)
 		else      : record = self._save(data)
 
-		print('Saving record', record)
 		self.session.commit()
 
 		setattr(self._o, '__id__', getattr(record, 'id', None))
+
+		if global_name is not None:
+			if ODB.load_by_name(global_name, self.__class__):
+				raise ValueError(f'❌ Name `{global_name}` is already taken')
+			self.set_name(global_name)
+
 		self._save_edges()
 		self._load_edges()
 
@@ -360,6 +315,51 @@ class ODB:
 		if get_origin(tp) in (list, List) : return result
 		elif result                       : return result[0]
 		else                              : return None
+
+	def get_name(self) -> str:
+		if not self._o.id:
+			raise ValueError('❌ Object must be saved before retrieving a name')
+
+		record = self.session.query(EdgeRecord).filter_by(
+			type1 = 'global',
+			id1   = 0,
+			rel1  = 'ref',
+			id2   = self._o.id,
+			type2 = self._o.__class__.__name__
+		).first()
+
+		if not record:
+			raise ValueError(f'❌ No global name found for object {self._o}')
+		return record.key1
+
+	def set_name(self, name: str):
+		if not self._o.id:
+			raise ValueError('❌ Object must be saved before assigning a name')
+
+		self.unset_name()
+		self.session.add(EdgeRecord(
+			id1   = 0,
+			type1 = 'global',
+			id2   = self._o.id,
+			type2 = self._o.__class__.__name__,
+			rel1  = 'ref',
+			key1  = name
+		))
+		self.session.commit()
+
+	def unset_name(self):
+		if not self._o.id:
+			raise ValueError('❌ Object must be saved before unassigning a name')
+
+		self.session.query(EdgeRecord).filter_by(
+			type1 = 'global',
+			id1   = 0,
+			rel1  = 'ref',
+			id2   = self._o.id,
+			type2 = self._o.__class__.__name__
+		).delete()
+		self.session.commit()
+
 
 
 

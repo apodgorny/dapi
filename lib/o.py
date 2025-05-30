@@ -39,39 +39,6 @@ class O(BaseModel):
 	# Public class methods
 	############################################################################
 
-	# @classmethod
-	# def is_allowed_type(cls, tp: Any) -> bool:
-	# 	origin = get_origin(tp)
-	# 	args   = get_args(tp)
-
-	# 	# Allow Optional[T]
-	# 	if origin is Union and type(None) in args:
-	# 		return cls.is_allowed_type(args[0])
-
-	# 	# Allow primitives
-	# 	if tp in (str, int, float, bool, type(None)):
-	# 		return True
-
-	# 	# Allow List[T]
-	# 	if origin in (list, List):
-	# 		return len(args) == 1 and cls.is_allowed_type(args[0])
-
-	# 	# Allow Dict[str, T]
-	# 	if origin in (dict, Dict):
-	# 		return len(args) == 2 and args[0] is str and cls.is_allowed_type(args[1])
-
-	# 	# Allow O models
-	# 	if cls.is_o_type(tp):
-	# 		return True
-
-	# 	return False  # Disallow all else
-
-	# @classmethod
-	# def validate_types(cls):
-	# 	for name, field in cls.model_fields.items():
-	# 		if not cls.is_allowed_type(field.annotation):
-	# 			raise TypeError(f'Disallowed type in `{cls.__name__}` field `{name}`: {field.annotation}')
-
 	@classmethod
 	def Field(cls, *args, description='', semantic=False, **kwargs):
 		extra = kwargs.setdefault('json_schema_extra', {})
@@ -116,13 +83,7 @@ class O(BaseModel):
 
 	@classmethod
 	def load(cls, ref: int | str) -> 'O':
-		if isinstance(ref, int):
-			return ODB.load(ref, cls)
-		
-		if isinstance(ref, str):
-			return ODB.get_by_name(ref, cls)
-		
-		raise TypeError(f'Invalid ref type: {type(ref)} — expected int or str')
+		return ODB.load(ref, cls)
 
 	# Getters
 	############################################################################
@@ -134,15 +95,6 @@ class O(BaseModel):
 	@property
 	def id(self):
 		return self.__dict__.get('__id__')
-
-	@property
-	def global_name(self):
-		return self.db.get_name(self)
-
-	@global_name.setter
-	def global_name(self, value: str):
-		self.db.set_name(self, value)
-
 
 	# Public
 	############################################################################
@@ -169,8 +121,9 @@ class O(BaseModel):
 		data.pop('id', None)
 		return self.__class__(**data)
 
-	def save(self):
-		self.db.save()
+	def save(self, global_name=None):
+		self.db.save(global_name)
+		return self
 
 	def delete(self):
 		self.db.delete()
