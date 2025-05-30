@@ -1,9 +1,11 @@
 from sqlalchemy     import inspect
 from sqlalchemy.orm import Session
 
-from typing       import get_origin, List, Dict
+from typing         import get_origin, List, Dict
 from .transform     import T
 from .edge          import Edge
+from dapi.db        import EdgeRecord
+
 
 
 class ODB:
@@ -11,6 +13,70 @@ class ODB:
 	session = None
 	types   = {}
 	objects = {}
+
+	# Class methods – global name related
+	################################################################################################
+
+	@classmethod
+	def get_name(cls, obj: 'O') -> str:
+		if not obj.id:
+			raise ValueError('❌ Object must be saved before retrieving a name')
+
+		record = cls.session.query(EdgeRecord).filter_by(
+			type1 = 'global',
+			id1   = 0,
+			rel1  = 'ref',
+			id2   = obj.id,
+			type2 = obj.__class__.__name__
+		).first()
+
+		if not record:
+			raise ValueError(f'❌ No global name found for object {obj}')
+		return record.key1
+
+	@classmethod
+	def get_by_name(cls, name: str, typ: type) -> 'O':
+		record = cls.session.query(EdgeRecord).filter_by(
+			type1 = 'global',
+			id1   = 0,
+			rel1  = 'ref',
+			key1  = name,
+			type2 = typ.__name__
+		).first()
+
+		if not record:
+			raise ValueError(f'❌ Named object `{name}` of type `{typ.__name__}` not found')
+		return cls.load(record.id2, typ)
+
+	@classmethod
+	def set_name(cls, obj: 'O', name: str):
+		if not obj.id:
+			raise ValueError('❌ Object must be saved before assigning a name')
+
+		cls.unset_name(obj)
+		cls.session.add(EdgeRecord(
+			id1   = 0,
+			type1 = 'global',
+			id2   = obj.id,
+			type2 = obj.__class__.__name__,
+			rel1  = 'ref',
+			key1  = name
+		))
+		cls.session.commit()
+
+	@classmethod
+	def unset_name(cls, obj: 'O'):
+		if not obj.id:
+			raise ValueError('❌ Object must be saved before assigning a name')
+
+		cls.session.query(EdgeRecord).filter_by(
+			type1 = 'global',
+			id1   = 0,
+			rel1  = 'ref',
+			id2   = obj.id,
+			type2 = obj.__class__.__name__
+		).delete()
+		cls.session.commit()
 
 	# Class methods
 	################################################################################################
@@ -209,12 +275,10 @@ class ODB:
 
 		return record
 
-
 	def _save(self, data):
 		record = self._orm_class(**data)
 		self.session.add(record)
 		return record
-
 
 	# Public
 	################################################################################################

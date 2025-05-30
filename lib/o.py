@@ -13,8 +13,10 @@ class O(BaseModel):
 	############################################################################
 
 	def __init__(self, *args, **kwargs):
-		if 'id' in kwargs:
-			raise KeyError(f'Attribute `id` is reserved. Use `{self.__class__.__name__}.load(id)` instead')
+		for k in ['id', 'global_name']:
+			if k in kwargs:
+				raise KeyError(f'Attribute `{k}` is reserved. Use `{self.__class__.__name__}.load({k})` instead')
+
 		super().__init__(*args, **kwargs)
 		self.__db__ = ODB(self)
 		self.__deleted__ = False
@@ -113,8 +115,14 @@ class O(BaseModel):
 		return T(T.PYDANTIC, T.DEREFERENCED_JSONSCHEMA, cls)
 
 	@classmethod
-	def load(cls, id: int) -> 'O':
-		return ODB.load(id, cls)
+	def load(cls, ref: int | str) -> 'O':
+		if isinstance(ref, int):
+			return ODB.load(ref, cls)
+		
+		if isinstance(ref, str):
+			return ODB.get_by_name(ref, cls)
+		
+		raise TypeError(f'Invalid ref type: {type(ref)} — expected int or str')
 
 	# Getters
 	############################################################################
@@ -126,6 +134,15 @@ class O(BaseModel):
 	@property
 	def id(self):
 		return self.__dict__.get('__id__')
+
+	@property
+	def global_name(self):
+		return self.db.get_name(self)
+
+	@global_name.setter
+	def global_name(self, value: str):
+		self.db.set_name(self, value)
+
 
 	# Public
 	############################################################################
