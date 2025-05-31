@@ -13,12 +13,16 @@ class Timeline(Agent):
 	class OutputType(O):
 		text: str
 
+
+	def create_timeline(self, name):
+		schema = TimelineSchema(
+			title   = name,
+			threads = []
+		).save(name)
+
 	async def invoke(self, name):
 		schema = TimelineSchema.load(name)
 		if not schema:
-			schema = TimelineSchema(
-				title   = name,
-				threads = []
-			).save(name)
+			self.create_timeline(name)
 		print(schema)
 		return 'done'

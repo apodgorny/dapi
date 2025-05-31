@@ -19,7 +19,6 @@ class O(BaseModel):
 
 		super().__init__(*args, **kwargs)
 		self.__db__ = ODB(self)
-		self.__deleted__ = False
 
 	def __getattr__(self, name: str):
 		if name in self.model_fields:
@@ -40,10 +39,11 @@ class O(BaseModel):
 	############################################################################
 
 	@classmethod
-	def Field(cls, *args, description='', semantic=False, **kwargs):
+	def Field(cls, *args, description='', semantic=False, reverse=None, **kwargs):
 		extra = kwargs.setdefault('json_schema_extra', {})
 		if description : extra['description'] = description
 		if semantic    : extra['semantic']    = True
+		if reverse     : extra['reverse']     = reverse
 		return Field(*args, description=description, **kwargs)
 
 	@classmethod
@@ -103,6 +103,9 @@ class O(BaseModel):
 	def to_json(self, r=False)          -> str  : return json.dumps(self.to_dict(r, e=True), indent=4, ensure_ascii=False)
 	def to_dict(self, r=False, e=False) -> dict : return T(T.PYDANTIC, T.DATA, self, recursive=r, show_empty=e)
 	def to_tree(self)                   -> str  : return T(T.PYDANTIC, T.TREE, self)
+	def get_name(self)                  -> str  : return self.db.get_name()
+	def set_name(self, name)                    : self.db.set_name(name); return self
+	def unset_name(self)                        : self.db.unset_name(); return self
 
 	def to_semantic_hint(self) -> str:
 		data = T(T.PYDANTIC, T.DATA, self)
@@ -121,8 +124,8 @@ class O(BaseModel):
 		data.pop('id', None)
 		return self.__class__(**data)
 
-	def save(self, global_name=None):
-		self.db.save(global_name)
+	def save(self):
+		self.db.save()
 		return self
 
 	def delete(self):

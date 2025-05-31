@@ -15,7 +15,7 @@ from lib import (
 	O,
 	Operator,
 	Agent,
-	AgentOnGrid,
+	Expert,
 	Spinner
 )
 from dapi.schemas import OperatorSchema
@@ -29,18 +29,18 @@ class RuntimeService(DapiService):
 
 	def get_globals(self, context=None, type_classes=None):
 		operator_globals = {
-			'Operator'    : Operator,
-			'Agent'       : Agent,
-			'AgentOnGrid' : AgentOnGrid,
-			'Spinner'     : Spinner,
+			'Operator'     : Operator,
+			'Agent'        : Agent,
+			'Expert' : Expert,
+			'Spinner'      : Spinner,
+ 
+			'O'            : O,
+			'String'       : String,
 
-			'O'           : O,
-			'String'      : String,
-			
-			'BaseModel'   : BaseModel,
-			'random'      : random,
-			'json'        : json,
-			'aiofiles'    : aiofiles,
+			'BaseModel'    : BaseModel,
+			'random'       : random,
+			'json'         : json,
+			'aiofiles'     : aiofiles,
 		}
 
 		#-----------------------------------------------------------------#

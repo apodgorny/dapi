@@ -67,7 +67,7 @@ class Code:
 				continue
 			if obj is Operator:
 				continue
-			if name in ['Agent', 'AgentOnGrid']:
+			if name in ['Agent', 'Expert']:
 				continue
 
 			try:

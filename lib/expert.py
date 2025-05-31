@@ -7,7 +7,7 @@ from .agent import Agent
 
 ################################################################
 
-class AgentOnGrid(Agent):
+class Expert(Agent):
 	'''Base class for agents inside StateGrid. Stateless transformation: State → State.'''
 
 	class InputType(BaseModel):
@@ -19,6 +19,12 @@ class AgentOnGrid(Agent):
 
 	class OutputType(BaseModel):
 		items : list[dict]
+
+	def make_prompt(self, intent):
+		# put in expertese
+		# put in intent prompt
+		# put in datatype
+		pass
 
 	async def invoke(self, state, data, h_ctx, v_ctx, c_ctx):
 		'''Agent logic happens here. Must return updated State.'''

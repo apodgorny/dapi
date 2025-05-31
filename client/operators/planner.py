@@ -5,11 +5,11 @@
 # 	O,
 # 	Operator,
 # 	Agent,
-# 	AgentOnGrid,
+# 	Expert,
 # )
 
 
-# class Planner(AgentOnGrid):
+# class Planner(Expert):
 
 # 	t_current_empty = '''
 # 		Сейчас только начинаем разбивать идею на заголовки.

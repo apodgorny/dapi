@@ -13,7 +13,7 @@ if 'CLIENT' in os.environ:
 	from .o                 import O
 	from .operator          import Operator
 	from .agent             import Agent
-	from .agent_on_grid     import AgentOnGrid
+	from .expert    import Expert
 	from .spinner           import Spinner
 
 else:
@@ -29,7 +29,7 @@ else:
 
 	from .operator          import Operator
 	from .agent             import Agent
-	from .agent_on_grid     import AgentOnGrid
+	from .expert    import Expert
 	from .spinner           import Spinner
 
 	from .execution_context import ExecutionContext

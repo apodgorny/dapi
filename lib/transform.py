@@ -50,10 +50,10 @@ class PYDANTIC:
 
 @T.register(T.PYDANTIC, T.STRING)
 def model_to_string(obj):
-	name    = obj.db.get_name()
-	label   = f'{name}:' if name else ''
-	id_str  = f'({label}{obj.id})' if obj.id else ''
-	data    = obj.to_dict(r=False, e=True)
+	name   = obj.db.get_name()
+	label  = f'{name}:' if name else ''
+	id_str = f'({label}{obj.id})' if obj.id else ''
+	data   = obj.to_dict(r=False, e=True)
 
 	def indent(text, level):
 		pad = ' ' * (level * 4)

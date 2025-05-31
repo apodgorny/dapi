@@ -5,7 +5,7 @@ from lib import (
 	O,
 	Operator,
 	Agent,
-	AgentOnGrid,
+	Expert,
 )
 
 

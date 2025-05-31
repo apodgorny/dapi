@@ -30,8 +30,7 @@ class ODB:
 		if isinstance(o_class, str):
 			o_class = cls.types[o_class]
 
-		key     = (o_class, id)
-
+		key  = (o_class, id)
 		if key in cls.objects:
 			return cls.objects[key]
 		
@@ -112,9 +111,10 @@ class ODB:
 	################################################################################################
 
 	def __init__(self, instance: 'O'):
-		self._o         = instance
-		self._orm_class = T(T.PYDANTIC, T.SQLALCHEMY_MODEL, type(instance))
-		self._edge      = Edge(self.session)
+		self._o          = instance
+		self._orm_class  = T(T.PYDANTIC, T.SQLALCHEMY_MODEL, type(instance))
+		self._edge       = Edge(self.session)
+		self._is_deleted = False
 
 	def __getattr__(self, name): return getattr(self.session, name)
 
@@ -155,128 +155,90 @@ class ODB:
 		o = self._o
 		s = self.session
 
-		def is_valid_edge_target(obj):
-			return (
-				o.is_o_instance(obj)
-				and obj.id is not None
-				and s.get(obj.db._orm_class, obj.id) is not None
-			)
-
 		for name, field in o.model_fields.items():
 			val         = getattr(o, name, None)
 			kind, inner = o.get_field_kind(name, field.annotation)
+			reverse     = field.field_info.extra.get('reverse')
 
 			if kind == 'single' and is_valid_edge_target(val):
-				self._save_edge(o, val, name)
+				self._save_edge(src=o, tgt=val, rel1=name, rel2=reverse)
 
 			elif kind == 'list' and isinstance(val, list):
 				for i, item in enumerate(val):
-					if is_valid_edge_target(item):
-						self._save_edge(o, item, name, key1=str(i))
+					self._save_edge(src=o, tgt=item, rel1=name, rel2=reverse, key1=str(i))
 
 			elif kind == 'dict' and isinstance(val, dict):
 				for k, item in val.items():
-					if is_valid_edge_target(item):
-						self._save_edge(o, item, name, key1=str(k))
+					self._save_edge(src=o, tgt=item, rel1=name, rel2=reverse, key1=str(k))
 
-	def _find_reverse_field(self, target, source):
-		for name, field in target.model_fields.items():
-			kind, inner = target.get_field_kind(name, field.annotation)
-			if kind == 'single' and isinstance(source, inner): return name
-			if kind == 'list'   and isinstance(source, inner): return name
-			if kind == 'dict'   and isinstance(source, inner): return name
-		return ''
-
-	def _save_edge(self, src, tgt, rel1, key1=''):
-		if src.is_o_instance(tgt) and not getattr(tgt, '__deleted__', False):
+	def _save_edge(self, src, tgt, rel1, rel2, key1='', key2=''):
+		if (
+			O.is_o_instance(tgt)
+			and tgt.id is not None
+			and self.session.get(tgt.db._orm_class, tgt.id) is not None
+			and not getattr(tgt.db, '_is_deleted', False)
+		):
 			tgt.save()
-			rel2 = self._find_reverse_field(tgt, src)
-			if src.id is not None and tgt.id is not None:
-				exists = self.session.query(self.edges.model).filter_by(
-					id1   = src.id,
-					id2   = tgt.id,
-					key1  = key1,
-					key2  = '',
-					rel1  = rel1,
-					rel2  = rel2
-				).first()
-				if not exists:
+			if src.id is not None:
+				kwargs = {
+					'id1'  : src.id, 'id2'  : tgt.id,
+					'rel1' : rel1,   'rel2' : rel2,
+					'key1' : key1,   'key2' : key2,
+				}
+				if not self.edges.update(** kwargs):
 					self.edges.create(
-						id1   = src.id,
+						** kwargs,
 						type1 = src.__class__.__name__,
-						id2   = tgt.id,
 						type2 = tgt.__class__.__name__,
-						rel1  = rel1,
-						rel2  = rel2,
-						key1  = key1,
-						key2  = ''
 					)
-
-	def _update(self, obj_id, data):
-		record = self.session.get(self._orm_class, obj_id)
-
-		if record is None:
-			raise ValueError(f'Record with id={obj_id} not found in table `{self._orm_class.__tablename__}`')
-
-		for key, value in data.items():
-			setattr(record, key, value)
-
-		return record
-
-	def _save(self, data):
-		record = self._orm_class(**data)
-		self.session.add(record)
-		return record
 
 	# Public
 	################################################################################################
 
 	@property
-	def edges(self)                 : return self._edge
+	def edges(self)         : return self._edge
 
 	@property
-	def table_name(self)            : return self._orm_class.__tablename__
+	def table_name(self)    : return self._orm_class.__tablename__
+	
+	def query(self)         : return self.session.query(self._orm_class)
+	def table_exists(self)  : return inspect(self.session.bind).has_table(self.table_name)
+	def create_table(self)  : self._orm_class.metadata.create_all(self.session.bind)
+	def drop_table(self)    : self._orm_class.metadata.drop_all(self.session.bind)
+	def filter(self, *args) : return self.query().filter(*args)
+	def get(self, id)       : return self._o_or_none(self.session.get(self._orm_class, id))
+	def first(self)         : return self._o_or_none(self.query().first())
+	def count(self)         : return self.query().count()
+	def exists(self)        : return self.query().exists().scalar()
+	def all(self)           : return [r for r in self.query().all() if isinstance(r, self._orm_class)]
+	def refresh(self)       : self.session.refresh(self._o)
+	def expunge(self)       : self.session.expunge(self._o)
+	def add(self)           : self.session.add(self._o)
+	def commit(self)        : self.create_table(); self.session.commit()
+	def rollback(self)      : self.session.rollback()
+	def flush(self)         : self.session.flush()
+	def close(self)         : self.session.close()
 
-	def query(self)                 : return self.session.query(self._orm_class)
-
-	def table_exists(self)          : return inspect(self.session.bind).has_table(self.table_name)
-	def create_table(self)          : self._orm_class.metadata.create_all(self.session.bind)
-	def drop_table(self)            : self._orm_class.metadata.drop_all(self.session.bind)
-
-	def filter(self, *args)         : return self.query().filter(*args)
-	def get(self, id)               : return self._o_or_none(self.session.get(self._orm_class, id))
-	def first(self)                 : return self._o_or_none(self.query().first())
-	def count(self)                 : return self.query().count()
-	def exists(self)                : return self.query().exists().scalar()
-	def all(self)                   : return [r for r in self.query().all() if isinstance(r, self._orm_class)]
-
-	def refresh(self)               : self.session.refresh(self._o)
-	def expunge(self)               : self.session.expunge(self._o)
-	def add(self)                   : self.session.add(self._o)
-	def commit(self)                : self.create_table(); self.session.commit()
-	def rollback(self)              : self.session.rollback()
-	def flush(self)                 : self.session.flush()
-	def close(self)                 : self.session.close()
-
-	def save(self, global_name=None):
+	def save(self):
 		data   = self._o.to_dict()
 		obj_id = getattr(self._o, '__id__', None)
 
 		self.create_table()
 
-		if obj_id : record = self._update(obj_id, data)
-		else      : record = self._save(data)
-
-		self.session.commit()
+		if obj_id:
+			# No need to check for existence – we assume id is valid
+			record = self.session.get(self._orm_class, obj_id)
+			if not record:
+				raise ValueError(f'Record with id={obj_id} not found in table `{self._orm_class.__tablename__}`')
+			for key, value in data.items():
+				setattr(record, key, value)
+		else:
+			record = self._orm_class(**data)
+			self.session.add(record)
 
 		setattr(self._o, '__id__', getattr(record, 'id', None))
-
-		if global_name is not None:
-			if ODB.load_by_name(global_name, self.__class__):
-				raise ValueError(f'❌ Name `{global_name}` is already taken')
-			self.set_name(global_name)
-
 		self._save_edges()
+		self.commit()
 		self._load_edges()
 
 	def delete(self):
@@ -292,7 +254,7 @@ class ODB:
 			self.query().filter(self._orm_class.id == id).delete()
 
 		self.commit()
-		self._o.__deleted__ = True
+		self._is_deleted = True
 
 	def get_related(self, name: str):
 		o      = self._o
@@ -336,16 +298,19 @@ class ODB:
 		if not self._o.id:
 			raise ValueError('❌ Object must be saved before assigning a name')
 
-		self.unset_name()
-		self.session.add(EdgeRecord(
-			id1   = 0,
-			type1 = 'global',
-			id2   = self._o.id,
-			type2 = self._o.__class__.__name__,
-			rel1  = 'ref',
-			key1  = name
-		))
-		self.session.commit()
+		if (name is not None) and (self.get_name() != name):
+			if ODB.load_by_name(name, self.__class__):
+				raise ValueError(f'❌ Name `{name}` already exists')
+
+			self.unset_name()
+			self.session.add(EdgeRecord(
+				id1   = 0,
+				type1 = 'global',
+				id2   = self._o.id,
+				type2 = self._o.__class__.__name__,
+				rel1  = 'ref',
+				key1  = name
+			))
 
 	def unset_name(self):
 		if not self._o.id:
@@ -358,8 +323,3 @@ class ODB:
 			id2   = self._o.id,
 			type2 = self._o.__class__.__name__
 		).delete()
-		self.session.commit()
-
-
-
-
