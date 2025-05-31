@@ -104,8 +104,6 @@ class O(BaseModel):
 	def to_dict(self, r=False, e=False) -> dict : return T(T.PYDANTIC, T.DATA, self, recursive=r, show_empty=e)
 	def to_tree(self)                   -> str  : return T(T.PYDANTIC, T.TREE, self)
 	def get_name(self)                  -> str  : return self.db.get_name()
-	def set_name(self, name)                    : self.db.set_name(name); return self
-	def unset_name(self)                        : self.db.unset_name(); return self
 
 	def to_semantic_hint(self) -> str:
 		data = T(T.PYDANTIC, T.DATA, self)
@@ -124,8 +122,8 @@ class O(BaseModel):
 		data.pop('id', None)
 		return self.__class__(**data)
 
-	def save(self):
-		self.db.save()
+	def save(self, name=None):
+		self.db.save(name)
 		return self
 
 	def delete(self):

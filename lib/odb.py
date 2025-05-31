@@ -192,6 +192,24 @@ class ODB:
 						type2 = tgt.__class__.__name__,
 					)
 
+	def _set_name(self, name: str):
+		if name is None or self.get_name() == name:
+			return
+
+		if ODB.load_by_name(name, self.__class__):
+			raise ValueError(f'❌ Name `{name}` already exists')
+
+		self.edges.set(
+			id1   = 0,
+			id2   = self._o.id,
+			type1 = 'global',
+			type2 = self._o.__class__.__name__,
+			rel1  = 'ref',
+			rel2  = 'ref',
+			key1  = name
+		)
+
+
 	# Public
 	################################################################################################
 
@@ -219,7 +237,7 @@ class ODB:
 	def flush(self)         : self.session.flush()
 	def close(self)         : self.session.close()
 
-	def save(self):
+	def save(self, name=None):
 		data   = self._o.to_dict()
 		obj_id = getattr(self._o, '__id__', None)
 
@@ -241,6 +259,10 @@ class ODB:
 		self.commit()
 		self._load_edges()
 
+		if name is not None:
+			self._set_name(name)
+			self.commit()
+
 	def delete(self):
 		id  = getattr(self._o, 'id', None)
 		typ = self._o.__class__.__name__
@@ -258,7 +280,7 @@ class ODB:
 
 	def get_related(self, name: str):
 		o      = self._o
-		edges  = self.edges.get_edges(o, rel=name)
+		edges  = self.edges.get(o, rel=name)
 		result = []
 
 		for edge in edges:
@@ -279,47 +301,7 @@ class ODB:
 		else                              : return None
 
 	def get_name(self) -> str:
-		if not self._o.id:
-			raise ValueError('❌ Object must be saved before retrieving a name')
-
-		record = self.session.query(EdgeRecord).filter_by(
-			type1 = 'global',
-			id1   = 0,
-			rel1  = 'ref',
-			id2   = self._o.id,
-			type2 = self._o.__class__.__name__
-		).first()
-
-		if record:
-			return record.key1
+		for edge in self.edges.get(self._o, rel='ref'):
+			if edge.id1 == 0 and edge.type1 == 'global':
+				return edge.key1
 		return None
-
-	def set_name(self, name: str):
-		if not self._o.id:
-			raise ValueError('❌ Object must be saved before assigning a name')
-
-		if (name is not None) and (self.get_name() != name):
-			if ODB.load_by_name(name, self.__class__):
-				raise ValueError(f'❌ Name `{name}` already exists')
-
-			self.unset_name()
-			self.session.add(EdgeRecord(
-				id1   = 0,
-				type1 = 'global',
-				id2   = self._o.id,
-				type2 = self._o.__class__.__name__,
-				rel1  = 'ref',
-				key1  = name
-			))
-
-	def unset_name(self):
-		if not self._o.id:
-			raise ValueError('❌ Object must be saved before unassigning a name')
-
-		self.session.query(EdgeRecord).filter_by(
-			type1 = 'global',
-			id1   = 0,
-			rel1  = 'ref',
-			id2   = self._o.id,
-			type2 = self._o.__class__.__name__
-		).delete()

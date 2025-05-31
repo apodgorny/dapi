@@ -18,7 +18,7 @@ class Timeline(Agent):
 		schema = TimelineSchema(
 			title   = name,
 			threads = []
-		).save(name)
+		).set_name(name).save()
 
 	async def invoke(self, name):
 		schema = TimelineSchema.load(name)
