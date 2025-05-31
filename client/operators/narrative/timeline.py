@@ -18,11 +18,12 @@ class Timeline(Agent):
 		schema = TimelineSchema(
 			title   = name,
 			threads = []
-		).set_name(name).save()
+		).save(name)
+		return schema
 
 	async def invoke(self, name):
 		schema = TimelineSchema.load(name)
 		if not schema:
-			self.create_timeline(name)
+			schema = self.create_timeline(name)
 		print(schema)
 		return 'done'

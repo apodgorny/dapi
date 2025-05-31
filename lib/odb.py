@@ -158,7 +158,7 @@ class ODB:
 		for name, field in o.model_fields.items():
 			val         = getattr(o, name, None)
 			kind, inner = o.get_field_kind(name, field.annotation)
-			reverse     = field.field_info.extra.get('reverse')
+			reverse     = field.json_schema_extra.get('reverse') if field.json_schema_extra else None
 
 			if kind == 'single' and is_valid_edge_target(val):
 				self._save_edge(src=o, tgt=val, rel1=name, rel2=reverse)
@@ -193,6 +193,9 @@ class ODB:
 					)
 
 	def _set_name(self, name: str):
+		if not self._o.id:
+			raise ValueError(f'❌ Id is not set in `{name}`')
+			
 		if name is None or self.get_name() == name:
 			return
 
@@ -254,14 +257,16 @@ class ODB:
 			record = self._orm_class(**data)
 			self.session.add(record)
 
-		setattr(self._o, '__id__', getattr(record, 'id', None))
 		self._save_edges()
 		self.commit()
+		setattr(self._o, '__id__', getattr(record, 'id', None))
 		self._load_edges()
 
 		if name is not None:
 			self._set_name(name)
 			self.commit()
+
+		return self
 
 	def delete(self):
 		id  = getattr(self._o, 'id', None)
