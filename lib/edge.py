@@ -2,7 +2,7 @@ from typing import Any
 
 from sqlalchemy import and_, or_
 
-from dapi.db import EdgeRecord
+from server.db import EdgeRecord
 
 
 class Edge:

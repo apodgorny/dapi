@@ -5,8 +5,8 @@ from typing        import Any, Dict, List, Optional
 
 from lib           import DapiService, DapiException, O, Python
 
-from dapi.db       import TypeRecord
-from dapi.schemas  import TypeSchema
+from server.db       import TypeRecord
+from server.schemas  import TypeSchema
 
 
 @DapiService.wrap_exceptions()

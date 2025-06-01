@@ -13,7 +13,6 @@ class Timeline(Agent):
 	class OutputType(O):
 		text: str
 
-
 	def create_timeline(self, name):
 		schema = TimelineSchema(
 			title   = name,
@@ -27,3 +26,6 @@ class Timeline(Agent):
 			schema = self.create_timeline(name)
 		print(schema)
 		return 'done'
+
+	async def foobar():
+		pass

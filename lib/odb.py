@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing         import get_origin, List, Dict
 from .transform     import T
 from .edge          import Edge
-from dapi.db        import EdgeRecord
+from server.db      import EdgeRecord
 
 
 

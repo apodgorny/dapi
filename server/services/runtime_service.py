@@ -15,10 +15,9 @@ from lib import (
 	O,
 	Operator,
 	Agent,
-	Expert,
-	Spinner
+	Expert
 )
-from dapi.schemas import OperatorSchema
+from server.schemas import OperatorSchema
 
 
 @DapiService.wrap_exceptions()
@@ -31,8 +30,7 @@ class RuntimeService(DapiService):
 		operator_globals = {
 			'Operator'     : Operator,
 			'Agent'        : Agent,
-			'Expert' : Expert,
-			'Spinner'      : Spinner,
+			'Expert'       : Expert,
  
 			'O'            : O,
 			'String'       : String,

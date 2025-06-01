@@ -1,15 +1,14 @@
 from fastapi.responses import PlainTextResponse
 
-from lib            import Dapi, ExecutionContext
-from dapi.services  import DefinitionService, RuntimeService, TypeService
-from dapi.schemas   import (
+from lib              import Dapi, ExecutionContext
+from server.services  import DefinitionService, RuntimeService, TypeService
+from server.schemas   import (
 	NameSchema,
 	EmptySchema,
 	StatusSchema,
 	TypeSchema,
 	OperatorSchema,
 	OperatorsSchema,
-	OperatorInputSchema,
 	OutputSchema
 )
 

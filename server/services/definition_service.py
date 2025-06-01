@@ -5,8 +5,8 @@ from typing import Any
 
 from lib import DapiException, DapiService, is_reserved, Module, String, Operator
 
-from dapi.db      import OperatorRecord
-from dapi.schemas import OperatorSchema
+from server.db      import OperatorRecord
+from server.schemas import OperatorSchema
 
 
 OPERATOR_DIR = os.path.join(

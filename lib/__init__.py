@@ -13,8 +13,7 @@ if 'CLIENT' in os.environ:
 	from .o                 import O
 	from .operator          import Operator
 	from .agent             import Agent
-	from .expert    import Expert
-	from .spinner           import Spinner
+	from .expert            import Expert
 
 else:
 	from .dapi              import Dapi, DapiException, DapiService
@@ -29,8 +28,7 @@ else:
 
 	from .operator          import Operator
 	from .agent             import Agent
-	from .expert    import Expert
-	from .spinner           import Spinner
+	from .expert            import Expert
 
 	from .execution_context import ExecutionContext
 

@@ -8,7 +8,7 @@ from fastapi.responses    import JSONResponse
 
 from lib.string           import String
 from lib.odb              import ODB
-from dapi.db              import Base, engine, session
+from server.db            import Base, engine, session
 from .dapi_exception      import DapiException
 
 ########################################################################

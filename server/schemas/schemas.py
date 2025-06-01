@@ -3,29 +3,31 @@ from datetime import datetime
 from typing   import Any, Dict, List, Literal
 from enum     import Enum
 
+from lib.o    import O
+
 
 # Generic schemas
 ###########################################################################
 
-class StatusSchema(BaseModel):
+class StatusSchema(O):
 	status: str = Field(..., description='Operation status message')
 
-class NameSchema(BaseModel):
+class NameSchema(O):
 	name: str = Field(..., description='Entity name')
 
-class IdSchema(BaseModel):
-	id: str = Field(..., description='Entity id')
-
-class EmptySchema(BaseModel):
+class EmptySchema(O):
 	pass
 
+class OutputSchema(O):
+	output: Dict[str, Any]
 
-class TypeSchema(BaseModel):
+
+class TypeSchema(O):
 	name        : str             = Field(...,                  description='Type name and class name (identical)')
 	code        : str             = Field(...,                  description='Python code that defines the type')
 	description : str             = Field('',                   description='Human‑readable description')
 
-class OperatorSchema(BaseModel):
+class OperatorSchema(O):
 	name        : str             = Field(...,                  description='Operator name')
 	class_name  : str             = Field(...,                  description='Class name of operator')
 	input_type  : Dict[str, Any]  = Field(...,                  description='Input type name')
@@ -36,27 +38,5 @@ class OperatorSchema(BaseModel):
 	config      : Dict[str, Any]  = Field(default_factory=dict, description='Configuration passed to interpreter')
 	restrict    : bool            = Field(default=True,         description='If True, apply interpreter restrictions')
 
-class OperatorsSchema(BaseModel):
+class OperatorsSchema(O):
 	items: List[OperatorSchema]
-
-class OperatorInstanceSchema(BaseModel):
-	id         : str
-	operator   : str
-	input      : dict
-	output     : dict = Field(default_factory=dict)
-	status     : Literal['created', 'running', 'invoked', 'error'] = 'created'
-	error      : str | None = None
-	children   : list[str] = Field(default_factory=list)
-	created_at : datetime = Field(default_factory=datetime.utcnow)
-	invoked_at : datetime | None = None
-
-class OperatorScopeSchema(RootModel[Dict[str, Any]]):
-	'''Validated dict-like object representing shared scope for a function.'''
-	pass
-
-class OperatorInputSchema(BaseModel):
-	name  : str
-	input : Dict[str, Any]
-
-class OutputSchema(BaseModel):
-	output: Dict[str, Any]

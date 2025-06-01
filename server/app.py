@@ -13,7 +13,7 @@ os.environ['PROJECT_PATH'] = os.path.dirname(
 from fastapi                 import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from dapi.controller         import dapi
+from server.controller       import dapi
 from lib                     import DapiException
 
 
