@@ -1,7 +1,7 @@
 #!make
 include .env
 
-.PHONY: start clear test apitest check
+.PHONY: start clear test apitest check install reinstall
 
 check:
 	echo $(PROJECT_PATH)
@@ -17,3 +17,10 @@ apitest:
 
 clear:
 	rm "$(PROJECT_PATH)/dapi.db" && echo "Cleared database"
+
+install:
+	pip install -e .
+
+reinstall:
+	pip uninstall -y wordwield || true
+	pip install -e .

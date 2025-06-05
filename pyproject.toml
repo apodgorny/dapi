@@ -1,16 +1,20 @@
 [project]
-name = "dapi"
+name = "wordwield"
 version = "0.1.0"
-description = ""
+description = "Spell Execution Environment"
 authors = [
-    {name = "Alexander Podgorny",email = "alexanderpodgorny@gmail.com"}
+    {name = "Alexander Podgorny", email = "alexanderpodgorny@gmail.com"}
 ]
-readme = "README.md"
-requires-python = ">=3.13"
 dependencies = [
+	"fastapi",
+	"uvicorn",
+	"pydantic",
+	"httpx",
+	"python-dotenv"
 ]
 
+[project.scripts]
+ww = "wordwield.__main__:main"
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.setuptools]
+packages = ["wordwield"]

@@ -1,39 +1,32 @@
 {
-    "version": "0.2.0",
-    "configurations": [{
-        "name"    : "▶ FastAPI (uvicorn)",
-        "type"    : "python",
-        "request" : "launch",
-        "module"  : "uvicorn",
-        "python"  : "/Users/alexander/vnv/dapi/bin/python",
-        "args"    : [
-          "server.app:app",
-          "--reload"
-        ],
-        "jinja"      : true,
-        "justMyCode" : true,
-        "console"    : "integratedTerminal",
-        "env"        : {
-          "PYTHONPATH" : "${workspaceFolder}"
-        }
-    },{
-        "name"       : "▶ Client (WordWield)",
-        "type"       : "python",
-        "request"    : "launch",
-        "program"    : "${workspaceFolder}/processes/story_og.py",
-        "console"    : "integratedTerminal",
-        "justMyCode" : true,
-        "env"        : {
-            "PYTHONPATH" : "${workspaceFolder}"
-        }
-    },{
-        "name"    : "Attach to Client",
-        "type"    : "python",
-        "request" : "attach",
-        "connect" : {
-        "host" : "localhost",
-        "port" : 5678
-        }
-    }]
-  }
-  
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name"    : "▶ FastAPI (uvicorn)",
+			"type"    : "python",
+			"request" : "launch",
+			"module"  : "uvicorn",
+			"cwd"     : "${workspaceFolder}",
+			"python"  : "${config:python.defaultInterpreterPath}",
+			"args"    : [
+				"wordwield.app:app",
+				"--reload"
+			],
+			"jinja"      : true,
+			"justMyCode" : false,
+			"console"    : "integratedTerminal",
+			"env"        : {
+				"PYTHONPATH": "${workspaceFolder}"
+			}
+		},
+		{
+			"name"    : "▶ Attach to Client",
+			"type"    : "python",
+			"request" : "attach",
+			"connect" : {
+				"host" : "localhost",
+				"port" : 5678
+			}
+		}
+	]
+}
